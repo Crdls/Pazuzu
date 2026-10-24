@@ -1,4 +1,4 @@
-# MonStrata
+# Pazuzu
 
 **English** · [Русский](docs/README.ru.md) · [中文](docs/README.zh.md)
 
@@ -41,7 +41,7 @@ with selectable period.
   of glowing eyes (`AbyssEyes.vue`).
 - **i18n** — UI in English, Russian, German, Spanish, French and Chinese;
   language is auto-detected from the browser and can be pinned per account
-  in Settings (the `monstrata_locale` cookie remembers the choice until a
+  in Settings (the `pazuzu_locale` cookie remembers the choice until a
   language is saved on the account). Strings live in
   `i18n/locales/*.json`, a new language = one JSON file + an entry in
   `nuxt.config.ts`.
@@ -62,8 +62,8 @@ with selectable period.
 ## Installation
 
 ```sh
-git clone https://github.com/Crdls/MonStrata.git
-cd MonStrata
+git clone https://github.com/Crdls/Pazuzu.git
+cd Pazuzu
 npm install --omit=dev
 npm run build
 ```
@@ -75,7 +75,7 @@ install or build step may get killed with exit code 135 — cap the Node heap:
 
 ## Updating
 
-The running build is a git checkout, so MonStrata knows its own commit and
+The running build is a git checkout, so Pazuzu knows its own commit and
 shows it in the sidebar; clicking that line checks for updates on the spot.
 Every 6 hours (or on "Check now") it asks `origin`
 whether the branch moved; Settings → Updates then offers "Update & restart"
@@ -104,7 +104,7 @@ work the same way):
 NITRO_HOST=0.0.0.0 NITRO_PORT=3003 node .output/server/index.mjs
 ```
 
-The database is a SQLite file `data/monstrata.db` (created automatically).
+The database is a SQLite file `data/data.db` (created automatically).
 Its path can be changed with `db.path` in `config.json` (applied at startup).
 System settings live in `config.json` in the project root — see
 [Authentication](#authentication).
@@ -116,12 +116,12 @@ System-level settings live in `config.json` next to the project root — copy
 
 ```json
 {
-  "db": { "path": "data/monstrata.db" },
+  "db": { "path": "data/data.db" },
   "auth": { "enabled": true }
 }
 ```
 
-The file is optional (absent = defaults: `data/monstrata.db`, auth off).
+The file is optional (absent = defaults: `data/data.db`, auth off).
 `auth.enabled` applies as soon as the file changes; `db.path` applies at
 startup — restart after changing it (relative paths resolve from the project
 root). Unlike the Settings page, these switches intentionally require
@@ -130,7 +130,7 @@ filesystem access — auth cannot be turned off from the web UI.
 With auth enabled:
 
 - no users yet → the app opens a first-run screen to create the admin account;
-- every API route and the WebSocket require the `monstrata_session` cookie
+- every API route and the WebSocket require the `pazuzu_session` cookie
   (HttpOnly, scrypt-hashed passwords in SQLite, sessions live 30 days and
   slide on use);
 - two roles: `admin` and `user`; admins get a **Users** page where they can
@@ -154,9 +154,9 @@ GitLab server on your LAN with OAuth2 (authorization code, scope
 
 1. In GitLab create an OAuth application (your profile → Applications, or
    Admin Area → Applications to offer it to everyone). Its redirect URI
-   must be the **full URL of MonStrata's OAuth callback endpoint**:
-   `http://<monstrata-host>:3003/api/auth/gitlab/callback`. GitLab matches
-   this string exactly — the bare host `http://<monstrata-host>:3003` is
+   must be the **full URL of Pazuzu's OAuth callback endpoint**:
+   `http://<pazuzu-host>:3003/api/auth/gitlab/callback`. GitLab matches
+   this string exactly — the bare host `http://<pazuzu-host>:3003` is
    *not* enough: GitLab would then deliver the code to `/`, which nobody
    handles, and you would land back on the login page with no error.
    Select the `read_user` scope;
@@ -211,11 +211,11 @@ The reset signs all sessions of that user out.
 
 ## Gateway (load balancer)
 
-MonStrata can also be the single entry point for applications calling the
+Pazuzu can also be the single entry point for applications calling the
 engines — one OpenAI-compatible endpoint in front of all of them:
 
 ```
-POST http://<monstrata-host>:3003/v1/chat/completions
+POST http://<pazuzu-host>:3003/v1/chat/completions
 Authorization: Bearer msk_…
 ```
 
@@ -231,8 +231,8 @@ in `config.json`:
   the API tokens that may call the gateway: an auto-generated `msk_…` key
   (shown exactly once, only its hash is stored) or your own token; tokens can
   be disabled and rotated, carry a priority and an optional debug flag that
-  adds `X-MonStrata-Server`, `X-MonStrata-Queue-Wait-Ms` and
-  `X-MonStrata-Session` response headers. Each client gets request counters
+  adds `X-Pazuzu-Server`, `X-Pazuzu-Queue-Wait-Ms` and
+  `X-Pazuzu-Session` response headers. Each client gets request counters
   and a source-IP history; token usage is tallied from the engine's `usage`
   chunk when the client asks for it (e.g. `stream_options.include_usage`),
   otherwise it is a bytes/4 estimate — stats, not billing.
@@ -260,7 +260,7 @@ in `config.json`:
   (low → normal after 30 s, then → high after 5 min more) so nobody starves.
   A request that waited `queueTimeoutS` (60 s) or hit the queue caps gets an
   OpenAI-style `429` with `Retry-After`. The queue lives in memory — a
-  MonStrata restart drops waiting requests (in-flight ones finish).
+  Pazuzu restart drops waiting requests (in-flight ones finish).
 - **Detaching a server** — per-server gateway mode on the Servers page:
   **Route** (default), **Drain** (only finish in-flight requests) or
   **Stats** (monitoring only, the gateway never forwards to it).

@@ -12,9 +12,9 @@ function check (name, cond) {
   if (!cond) failed++
 }
 
-const dir = mkdtempSync(join(tmpdir(), 'monstrata-config-test-'))
+const dir = mkdtempSync(join(tmpdir(), 'pazuzu-config-test-'))
 const file = join(dir, 'config.json')
-process.env.MONSTRATA_CONFIG = file
+process.env.PAZUZU_CONFIG = file
 
 // the loader caches by file mtime - pause between writes so they differ
 async function write (text) {
@@ -80,7 +80,7 @@ cfg = loadConfig()
 check('invalid json falls back to defaults', cfg.db.path === CONFIG_DEFAULTS.db.path && cfg.auth.enabled === false)
 console.error = errLog
 
-process.env.MONSTRATA_CONFIG = join(dir, 'does-not-exist.json')
+process.env.PAZUZU_CONFIG = join(dir, 'does-not-exist.json')
 cfg = loadConfig()
 check('missing file uses defaults', cfg.db.path === CONFIG_DEFAULTS.db.path && cfg.auth.enabled === false)
 

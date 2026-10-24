@@ -2,7 +2,7 @@
 import { de, en, es, fr, ru, zh_cn } from '@nuxt/ui/locale'
 
 useHead({
-  titleTemplate: (title?: string | null) => (title ? `${title} · MonStrata` : 'MonStrata'),
+  titleTemplate: (title?: string | null) => (title ? `${title} · Pazuzu` : 'Pazuzu'),
   link: [{ rel: 'icon', type: 'image/svg+xml', href: '/favicon.svg' }]
 })
 

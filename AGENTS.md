@@ -1,6 +1,6 @@
 # AGENTS.md
 
-MonStrata: Nuxt 4 monitor for Strata inference engines. Scrapes Prometheus `/metrics` from several servers into SQLite; serves a live dashboard (WebSocket + polling fallback), metric history with rollups, a load heatmap, and i18n.
+Pazuzu: Nuxt 4 monitor for Strata inference engines. Scrapes Prometheus `/metrics` from several servers into SQLite; serves a live dashboard (WebSocket + polling fallback), metric history with rollups, a load heatmap, and i18n.
 
 ## Commands
 
@@ -14,11 +14,11 @@ MonStrata: Nuxt 4 monitor for Strata inference engines. Scrapes Prometheus `/met
 
 - Nuxt 4 layout: frontend in `app/`, Nitro backend in `server/` (file-based API in `server/api/`, WS route `server/routes/_ws.ts`).
 - Background loops are Nitro plugins (`server/plugins/scraper.ts`, `rollups.ts`) driving `server/utils/scheduler.ts`: self-rescheduling `setTimeout` that re-reads intervals from the DB every cycle, so settings changes apply without restart (`settings.put.ts` also calls `schedule*` directly).
-- All process-wide server state lives on `globalThis.__monstrata` via `server/utils/runtime.ts` so dev HMR doesn't duplicate timers or lose counter baselines. Add new background state there, never in module-local variables.
-- SQLite via better-sqlite3 (synchronous API), file `data/monstrata.db` (gitignored, auto-created; path from `db.path` in `config.json`, applied when the DB opens at startup). Schema is inline `CREATE ... IF NOT EXISTS` DDL in `server/utils/db.ts` — there is **no migration system**, so schema changes must be idempotent and existing dev DBs updated by hand.
+- All process-wide server state lives on `globalThis.__pazuzu` via `server/utils/runtime.ts` so dev HMR doesn't duplicate timers or lose counter baselines. Add new background state there, never in module-local variables.
+- SQLite via better-sqlite3 (synchronous API), file `data/data.db` (gitignored, auto-created; path from `db.path` in `config.json`, applied when the DB opens at startup). Schema is inline `CREATE ... IF NOT EXISTS` DDL in `server/utils/db.ts` — there is **no migration system**, so schema changes must be idempotent and existing dev DBs updated by hand.
 - Storage tiers: `samples` (raw, ~10 s, 48 h) → `rollup_hourly` (400 d) → `rollup_daily` (forever). `/api/range` picks the tier itself from row counts; `server/utils/rollup.ts` is idempotent (recomputes last 3 h / 3 d) and also performs retention deletes.
 - Frontend live state is one shared plugin (`app/plugins/live.ts`, accessed via `useLive()`); pages must not open their own WebSocket.
-- Auth is opt-in via `config.json` (`server/utils/config.ts`, path overridable with `MONSTRATA_CONFIG`; missing file = defaults; reloaded on mtime change, never write it from app code). `server/middleware/auth.ts` gates `/api/*` (public allowlist in `OPEN_AUTH_PATHS`; `/api/auth/password` requires a session) and `/_ws` checks the cookie in its own `open()` handler (WS upgrades bypass middleware). Frontend gate: `app/middleware/auth.global.ts` + `useAuth()`; SSR pages that fetch `/api` must forward cookies (`headers: useRequestHeaders(['cookie'])`).
+- Auth is opt-in via `config.json` (`server/utils/config.ts`, path overridable with `PAZUZU_CONFIG`; missing file = defaults; reloaded on mtime change, never write it from app code). `server/middleware/auth.ts` gates `/api/*` (public allowlist in `OPEN_AUTH_PATHS`; `/api/auth/password` requires a session) and `/_ws` checks the cookie in its own `open()` handler (WS upgrades bypass middleware). Frontend gate: `app/middleware/auth.global.ts` + `useAuth()`; SSR pages that fetch `/api` must forward cookies (`headers: useRequestHeaders(['cookie'])`).
 - Users/sessions are SQLite tables (db.ts); passwords are scrypt hashes. Roles: `admin`/`user` — admins manage users at `/api/users*` and the `/users` page, and `PUT /api/settings` is admin-only while auth is on; `users.disabled` freezes an account (`verifySessionToken` kills the session), `users.gitlab` marks OAuth-created accounts, `servers.created_by` records the author — server edits go to creator-or-admin only (`canManageServer`, rules in `server/utils/permissions.ts`, reachable from bare Node). `server/utils/credentials.ts` holds the pure primitives (hash/token/cookie) and must not import other utils. Files reachable from bare Node (`credentials.ts`, `db.ts`, `config.ts`, `runtime.ts`, `permissions.ts` — imported by tests and `scripts/reset-password.mjs`) must use explicit `.ts` extensions in relative imports; extensionless imports break plain Node loading.
 
 ## Metrics
@@ -31,9 +31,9 @@ MonStrata: Nuxt 4 monitor for Strata inference engines. Scrapes Prometheus `/met
 ## Gateway (/v1 load-balancing proxy)
 
 - `server/routes/v1/[...].ts` is the catch-all; it bypasses the auth middleware (which only gates `/api/*`) and authenticates clients by `msk_…` bearer tokens — sha256 in the `gateway_clients` table, raw token shown once at create/rotate (`server/utils/gateway/tokens.ts`, hash reuses `hashToken` from credentials.ts; errors are OpenAI-shaped JSON).
-- Pure, bare-Node-testable core in `server/utils/gateway/`: `types.ts` (ServerLoad + admissibility), `router.ts` (affinity → least-loaded), `queue.ts` (strict priority + aging 30 s/5 min, per-client round-robin), `session.ts` (`X-Session-Id` header → hash of the conversation opening → no key), `proxy.ts` (fetch forwarding, SSE `usage` sniffing). `state.ts` wires them to the DB and to `globalThis.__monstrata` via `gatewayRuntime()` (inflight counters, queues, affinity cache, IP/usage aggregators); the 5 s maintenance loop is `server/plugins/gateway.ts`.
+- Pure, bare-Node-testable core in `server/utils/gateway/`: `types.ts` (ServerLoad + admissibility), `router.ts` (affinity → least-loaded), `queue.ts` (strict priority + aging 30 s/5 min, per-client round-robin), `session.ts` (`X-Session-Id` header → hash of the conversation opening → no key), `proxy.ts` (fetch forwarding, SSE `usage` sniffing). `state.ts` wires them to the DB and to `globalThis.__pazuzu` via `gatewayRuntime()` (inflight counters, queues, affinity cache, IP/usage aggregators); the 5 s maintenance loop is `server/plugins/gateway.ts`.
 - Admission control is gateway-owned: the gateway's own inflight counter is authoritative (capacity: `servers.gateway_capacity` → `strata:live_slots` → `gateway.defaultCapacity`), and a server with scrape-reported `waiting > 0`, KV usage ≥ 95% or a recent live error (`ejectionS`) temporarily takes no new work — this keeps the upstream engine's own FIFO queue empty so the gateway priorities mean something.
-- `gateway.enabled` in `config.json` is false by default and must stay that way; `servers.gateway_mode` (`on | drain | off`) and `gateway_capacity` are edited via PATCH `/api/servers/:id` and the Servers page; client CRUD + status live under `/api/gateway/*` (admin-only while auth is on) with the `/clients` page. Restarting MonStrata drops in-memory queues (documented in README).
+- `gateway.enabled` in `config.json` is false by default and must stay that way; `servers.gateway_mode` (`on | drain | off`) and `gateway_capacity` are edited via PATCH `/api/servers/:id` and the Servers page; client CRUD + status live under `/api/gateway/*` (admin-only while auth is on) with the `/clients` page. Restarting Pazuzu drops in-memory queues (documented in README).
 - Client ⇄ server access: `gateway_clients.servers_all` (1 = every server, the default) plus `gateway_client_servers` pairs; routing filters loads per client (`allowedServerIds`/`loadsForClient` in `gateway/state.ts`), and a queued task whose allowed engines are all saturated does not block lanes other clients could use. Both directions are edited from the UI: the Clients page (`serversAll`+`serverIds` on POST/PATCH) and the Servers page (`PUT /api/gateway/servers/:id/clients`, which flips an unchecked unrestricted client to an explicit selection of the other current servers).
 
 ## Version check & updates
@@ -43,7 +43,7 @@ MonStrata: Nuxt 4 monitor for Strata inference engines. Scrapes Prometheus `/met
 
 ## i18n
 
-- Six locales in `i18n/locales/*.json`; `en.json` is canonical and all six are currently key-synced — add every new UI string to all six files. A new language = one JSON file + entry in `nuxt.config.ts` (strategy `no_prefix`, cookie `monstrata_locale`).
+- Six locales in `i18n/locales/*.json`; `en.json` is canonical and all six are currently key-synced — add every new UI string to all six files. A new language = one JSON file + entry in `nuxt.config.ts` (strategy `no_prefix`, cookie `pazuzu_locale`).
 
 ## nuxt.config.ts — do not remove these nitro workarounds
 

@@ -14,7 +14,7 @@ import {
 } from '../../utils/gateway/proxy'
 
 /**
- * /v1/** — the load-balancing gateway. Clients hit MonStrata with their
+ * /v1/** — the load-balancing gateway. Clients hit Pazuzu with their
  * `msk_` bearer token; the request is admitted by the priority waiting room,
  * routed by chat affinity → least-loaded engine, and streamed straight back.
  * Bypasses the cookie auth middleware (which only gates /api/*): access is
@@ -24,7 +24,7 @@ import {
 const MAX_BODY_BYTES = 64 * 1024 * 1024
 
 function jsonError (status: number, message: string, code: string, extraHeaders?: Record<string, string>): Response {
-  return new Response(JSON.stringify({ error: { message, type: 'monstrata_error', code, param: null } }), {
+  return new Response(JSON.stringify({ error: { message, type: 'pazuzu_error', code, param: null } }), {
     status,
     headers: { 'content-type': 'application/json', 'access-control-allow-origin': '*', ...extraHeaders }
   })
@@ -51,7 +51,7 @@ function findServerRow (id: number): ServerRow | null {
 export default defineEventHandler(async (event) => {
   const gwCfg = loadConfig().gateway
   if (!gwCfg.enabled) {
-    return jsonError(503, 'The MonStrata gateway is disabled (gateway.enabled in config.json)', 'gateway_disabled')
+    return jsonError(503, 'The Pazuzu gateway is disabled (gateway.enabled in config.json)', 'gateway_disabled')
   }
 
   const method = getMethod(event)
@@ -213,10 +213,10 @@ export default defineEventHandler(async (event) => {
 
   const extra: Record<string, string> = {}
   if (client.debug) {
-    extra['x-monstrata-server'] = routed?.name ?? String(serverId)
-    extra['x-monstrata-queue-wait-ms'] = String(waitedMs)
-    extra['x-monstrata-retries'] = String(failed.size)
-    if (keyHash) extra['x-monstrata-session'] = keyHash.slice(0, 12)
+    extra['x-pazuzu-server'] = routed?.name ?? String(serverId)
+    extra['x-pazuzu-queue-wait-ms'] = String(waitedMs)
+    extra['x-pazuzu-retries'] = String(failed.size)
+    if (keyHash) extra['x-pazuzu-session'] = keyHash.slice(0, 12)
   }
   return new Response(body, {
     status: response.status,

@@ -8,7 +8,7 @@ export default defineNitroPlugin(() => {
     try {
       runRollups()
     } catch (err) {
-      console.error('[monstrata] initial rollup failed:', err)
+      console.error('[pazuzu] initial rollup failed:', err)
     }
   }, 5000).unref?.()
 })

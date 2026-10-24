@@ -17,9 +17,9 @@ function check (name, cond) {
 }
 
 // an isolated database - the first useDb() call below reads this config
-const dir = mkdtempSync(join(tmpdir(), 'monstrata-access-test-'))
-process.env.MONSTRATA_CONFIG = join(dir, 'config.json')
-writeFileSync(process.env.MONSTRATA_CONFIG, JSON.stringify({ db: { path: join(dir, 'access.db') } }))
+const dir = mkdtempSync(join(tmpdir(), 'pazuzu-access-test-'))
+process.env.PAZUZU_CONFIG = join(dir, 'config.json')
+writeFileSync(process.env.PAZUZU_CONFIG, JSON.stringify({ db: { path: join(dir, 'access.db') } }))
 
 const db = useDb()
 const addServer = (name) => Number(db

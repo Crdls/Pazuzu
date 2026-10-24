@@ -88,11 +88,11 @@ export interface GatewayRuntime {
   loopTimer?: ReturnType<typeof setTimeout>
 }
 
-const g = globalThis as typeof globalThis & { __monstrata?: Runtime }
+const g = globalThis as typeof globalThis & { __pazuzu?: Runtime }
 
 export function runtime (): Runtime {
-  if (!g.__monstrata) {
-    g.__monstrata = {
+  if (!g.__pazuzu) {
+    g.__pazuzu = {
       prev: new Map(),
       prevTs: new Map(),
       snapshots: new Map(),
@@ -101,7 +101,7 @@ export function runtime (): Runtime {
       gitlabStates: new Map()
     }
   }
-  const rt = g.__monstrata
+  const rt = g.__pazuzu
   // a global created by an older module version (dev HMR) may miss newer fields
   if (!rt.authFails) rt.authFails = new Map()
   if (!rt.gitlabStates) rt.gitlabStates = new Map()

@@ -64,7 +64,7 @@ export default defineEventHandler(async (event) => {
     startSession(event, user.id)
     return sendRedirect(event, '/')
   } catch (err) {
-    console.error('[monstrata] GitLab sign-in failed:', err)
+    console.error('[pazuzu] GitLab sign-in failed:', err)
     return fail('gitlab')
   }
 })

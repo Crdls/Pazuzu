@@ -56,7 +56,7 @@ export interface GatewayClientRow {
   /** non-secret label for the admin table */
   token_hint: string
   priority: ClientPriority
-  /** expose X-MonStrata-* debug headers on this client's responses */
+  /** expose X-Pazuzu-* debug headers on this client's responses */
   debug: number
   enabled: number
   /** 1 = every gateway server is reachable; 0 = only the gateway_client_servers pairs */

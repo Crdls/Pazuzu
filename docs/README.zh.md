@@ -1,4 +1,4 @@
-# MonStrata
+# Pazuzu
 
 [English](../README.md) · [Русский](README.ru.md) · **中文**
 
@@ -36,7 +36,7 @@
   空状态页面由一双发光的眼睛守望（`AbyssEyes.vue`）。
 - **国际化** — 界面支持英语、俄语、德语、西班牙语、法语和中文；
   语言默认根据浏览器自动检测，可在设置中为账户固定
-  （固定前由 `monstrata_locale` cookie 记住上次选择）。文案位于 `i18n/locales/*.json`，
+  （固定前由 `pazuzu_locale` cookie 记住上次选择）。文案位于 `i18n/locales/*.json`，
   新增语言 = 一个 JSON 文件 + `nuxt.config.ts` 中的一条配置。
 - **可选的身份验证** — 在 `config.json` 中开启 `auth.enabled`；
   账户存储在 SQLite 中，密码使用 scrypt 哈希，登录有效期 30 天并在使用时
@@ -51,8 +51,8 @@
 ## 安装
 
 ```sh
-git clone https://github.com/Crdls/MonStrata.git
-cd MonStrata
+git clone https://github.com/Crdls/Pazuzu.git
+cd Pazuzu
 npm install --omit=dev
 npm run build
 ```
@@ -63,7 +63,7 @@ npm run build
 
 ## 更新
 
-运行中的构建就是一个 git 克隆，因此 MonStrata 知道自己的提交并显示在侧栏中；
+运行中的构建就是一个 git 克隆，因此 Pazuzu 知道自己的提交并显示在侧栏中；
 点击这一行就会就地检查更新。每 6 小时（或点击"立即检查"时）它会询问
 `origin` 分支是否有新提交；
 届时设置中会出现"更新并重启"按钮（开启验证后仅管理员）。
@@ -88,7 +88,7 @@ node .output/server/index.mjs    # http://localhost:3000
 NITRO_HOST=0.0.0.0 NITRO_PORT=3003 node .output/server/index.mjs
 ```
 
-数据库是 SQLite 文件 `data/monstrata.db`（自动创建）。
+数据库是 SQLite 文件 `data/data.db`（自动创建）。
 路径可通过 `config.json` 中的 `db.path` 修改（启动时生效）。
 系统设置位于项目根目录的 `config.json`，见下文「身份验证」。
 
@@ -99,12 +99,12 @@ NITRO_HOST=0.0.0.0 NITRO_PORT=3003 node .output/server/index.mjs
 
 ```json
 {
-  "db": { "path": "data/monstrata.db" },
+  "db": { "path": "data/data.db" },
   "auth": { "enabled": true }
 }
 ```
 
-该文件是可选的（不存在 = 默认值：`data/monstrata.db`，验证关闭）。
+该文件是可选的（不存在 = 默认值：`data/data.db`，验证关闭）。
 `auth.enabled` 在文件修改后立即生效；`db.path` 在启动时生效，修改后需重启
 （相对路径相对于项目根目录解析）。与设置页面不同，这些设置有意要求
 文件系统访问权限 — 无法从 Web 界面关闭身份验证。
@@ -112,7 +112,7 @@ NITRO_HOST=0.0.0.0 NITRO_PORT=3003 node .output/server/index.mjs
 开启验证后：
 
 - 尚无任何用户 → 应用打开创建首个管理员账户的界面；
-- 所有 API 请求和 WebSocket 都需要 `monstrata_session` cookie
+- 所有 API 请求和 WebSocket 都需要 `pazuzu_session` cookie
   （HttpOnly，密码为 SQLite 中的 scrypt 哈希，会话有效期 30 天并在使用时续期）；
 - 两种角色：`admin` 和 `user`；管理员可见「用户」页面，可在其中更换角色、
   为任何用户指派新密码（无需知道旧密码）、冻结账户（被冻结者无法登录，
@@ -131,10 +131,10 @@ NITRO_HOST=0.0.0.0 NITRO_PORT=3003 node .output/server/index.mjs
 （authorization code，scope `read_user`）认证 — 无需额外的 IdP 服务：
 
 1. 在 GitLab 中创建 OAuth 应用（个人档案 → 「应用」，或在 Admin Area →
-   「应用」中创建以供所有人使用）。redirect URI 必须填写 MonStrata 的
+   「应用」中创建以供所有人使用）。redirect URI 必须填写 Pazuzu 的
    OAuth callback 端点的**完整 URL**：
-   `http://<monstrata-主机>:3003/api/auth/gitlab/callback`。GitLab 逐字符
-   精确匹配 — 只写主机 `http://<monstrata-主机>:3003` *不够*：GitLab 会把
+   `http://<pazuzu-主机>:3003/api/auth/gitlab/callback`。GitLab 逐字符
+   精确匹配 — 只写主机 `http://<pazuzu-主机>:3003` *不够*：GitLab 会把
    code 送回 `/`，没有任何处理器，结果就是无声地退回登录页。scope 选
    `read_user`；
 2. 把应用的 id/secret 写入 `config.json`：
@@ -183,11 +183,11 @@ node scripts/reset-password.mjs <用户名或 id> [新密码]
 
 ## 网关（负载均衡器）
 
-MonStrata 还可以作为所有应用调用引擎的唯一入口——在所有引擎前面的一个
+Pazuzu 还可以作为所有应用调用引擎的唯一入口——在所有引擎前面的一个
 OpenAI 兼容端点：
 
 ```
-POST http://<monstrata-主机>:3003/v1/chat/completions
+POST http://<pazuzu-主机>:3003/v1/chat/completions
 Authorization: Bearer msk_…
 ```
 
@@ -201,8 +201,8 @@ Authorization: Bearer msk_…
 - **客户端** — 「客户端」页面（开启验证后仅管理员）管理允许调用网关的
   API 令牌：自动生成 `msk_…` 密钥（只显示一次，仅存储其哈希）或使用
   自定义令牌；令牌可停用、轮换，带有优先级和可选的调试标记，后者会给响应
-  加上 `X-MonStrata-Server`、`X-MonStrata-Queue-Wait-Ms`、
-  `X-MonStrata-Session` 头。每个客户端都有请求计数和来源 IP 记录；
+  加上 `X-Pazuzu-Server`、`X-Pazuzu-Queue-Wait-Ms`、
+  `X-Pazuzu-Session` 头。每个客户端都有请求计数和来源 IP 记录；
   token 用量在客户端索取 `usage` 数据块（如 `stream_options.include_usage`）
   时从引擎响应统计，否则按字节数/4 估算——是统计，不是账单。
 - **客户端的服务器访问权限** — 可以限制每个客户端可用的引擎集合：在「客户端」
@@ -222,7 +222,7 @@ Authorization: Bearer msk_…
   高 / 普通 / 低），同通道内按客户端公平轮转；等待会逐步提升请求
   （低 → 普通经 30 秒，再 → 高经 5 分钟），因此不会饿死。等待超过
   `queueTimeoutS`（60 秒）或触及队列上限的请求会收到带 `Retry-After` 的
-  OpenAI 风格 `429`。队列存在于内存中——重启 MonStrata 会丢弃排队中的请求
+  OpenAI 风格 `429`。队列存在于内存中——重启 Pazuzu 会丢弃排队中的请求
   （进行中的会正常完成）。
 - **从网关注摘除服务器** — 服务器页面的网关模式：**路由**（默认）、
   **排空**（只完成进行中的请求）、**统计**（仅监控，网关不再转发）。

@@ -276,7 +276,7 @@ function scheduleGatewayLoop (): void {
     try {
       gatewayTick()
     } catch (err) {
-      console.error('[monstrata] gateway tick failed:', err)
+      console.error('[pazuzu] gateway tick failed:', err)
     }
     scheduleGatewayLoop()
   }, 5000)

@@ -1,6 +1,6 @@
 {
   "db": {
-    "path": "data/monstrata.db"
+    "path": "data/data.db"
   },
   "auth": {
     "enabled": false,

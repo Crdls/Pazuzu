@@ -67,7 +67,7 @@ export const GATEWAY_DEFAULTS: GatewayConfig = {
 }
 
 export const CONFIG_DEFAULTS: AppConfig = {
-  db: { path: 'data/monstrata.db' },
+  db: { path: 'data/data.db' },
   auth: {
     enabled: false,
     gitlab: { enabled: false, baseUrl: '', clientId: '', clientSecret: '', redirectUri: '', allowedGroups: [], caCert: '', insecureTls: false }
@@ -76,7 +76,7 @@ export const CONFIG_DEFAULTS: AppConfig = {
 }
 
 export function configPath (): string {
-  return process.env.MONSTRATA_CONFIG || resolve(process.cwd(), 'config.json')
+  return process.env.PAZUZU_CONFIG || resolve(process.cwd(), 'config.json')
 }
 
 function str (raw: unknown): string {
@@ -137,7 +137,7 @@ export function parseConfig (text: string | null): AppConfig {
       gateway: parseGateway(raw?.gateway)
     }
   } catch (err) {
-    console.error('[monstrata] could not parse config.json, using defaults:', err)
+    console.error('[pazuzu] could not parse config.json, using defaults:', err)
     return CONFIG_DEFAULTS
   }
 }
@@ -161,12 +161,12 @@ export function loadConfig (): AppConfig {
       try {
         text = readFileSync(configPath(), 'utf8')
       } catch (err) {
-        console.error('[monstrata] could not read config.json, using defaults:', err)
+        console.error('[pazuzu] could not read config.json, using defaults:', err)
       }
     }
     const value = parseConfig(text)
     if (value.auth.gitlab.enabled && value.auth.gitlab.insecureTls) {
-      console.warn('[monstrata] GitLab TLS certificate verification is disabled (auth.gitlab.insecureTls)')
+      console.warn('[pazuzu] GitLab TLS certificate verification is disabled (auth.gitlab.insecureTls)')
     }
     rt.config = { mtime, value }
   }

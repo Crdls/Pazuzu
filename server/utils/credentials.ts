@@ -7,7 +7,7 @@ import { createHash, randomBytes, scrypt, timingSafeEqual } from 'node:crypto'
  * scripts/reset-password.mjs). DB/session glue lives in ./auth.ts.
  */
 
-export const SESSION_COOKIE = 'monstrata_session'
+export const SESSION_COOKIE = 'pazuzu_session'
 export const SESSION_TTL_MS = 30 * 24 * 3600 * 1000
 
 const SCRYPT = { N: 32768, r: 8, p: 1, keylen: 32 }

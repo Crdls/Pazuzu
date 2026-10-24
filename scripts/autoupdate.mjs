@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// Applies a MonStrata update after the server exits, then restarts it.
+// Applies a Pazuzu update after the server exits, then restarts it.
 // Spawned detached by POST /api/update/apply with the server's PID as argv[2];
 // stdout/stderr already point at data/update.log (inherited stdio).
 // A failed step aborts the update, but the old build is always restarted so
@@ -63,9 +63,9 @@ function restart () {
     console.log('\n.output/server/index.mjs is missing - start the server by hand')
     return
   }
-  console.log('\nRestarting MonStrata...')
+  console.log('\nRestarting Pazuzu...')
   // inherit keeps the server's console output in the same update.log; env
-  // (NITRO_HOST/NITRO_PORT, MONSTRATA_CONFIG, ...) carries over from the old one
+  // (NITRO_HOST/NITRO_PORT, PAZUZU_CONFIG, ...) carries over from the old one
   const child = spawn(process.execPath, [entry], {
     cwd: root, detached: true, stdio: 'inherit', windowsHide: true, env: process.env
   })

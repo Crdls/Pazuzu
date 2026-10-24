@@ -131,7 +131,7 @@ function isActive (to: string) {
           variant="ghost"
           icon="i-lucide-github"
           :aria-label="t('footer.source')"
-          to="https://github.com/Crdls/MonStrata"
+          to="https://github.com/Crdls/Pazuzu"
           target="_blank"
           rel="noopener"
           class="shrink-0"

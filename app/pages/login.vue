@@ -70,7 +70,7 @@ async function submit () {
     <div class="w-full max-w-sm">
       <div class="flex items-center justify-center gap-2 font-semibold text-highlighted mb-6">
         <img src="/logo.svg" class="size-10 glow-hover" alt="" />
-        <span class="text-lg">MonStrata</span>
+        <span class="text-lg">Pazuzu</span>
       </div>
 
       <UCard variant="soft" class="bg-elevated/30">

@@ -1,5 +1,5 @@
 /**
- * Catalog of every metric MonStrata knows about: how to label, display and
+ * Catalog of every metric Pazuzu knows about: how to label, display and
  * aggregate it. Metrics scraped from /metrics are stored verbatim; `derived:*`
  * series are computed by the scraper (rates, percentages, window averages).
  */

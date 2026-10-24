@@ -1,5 +1,5 @@
 @echo off
-rem Install or update MonStrata: pull, install production deps, build.
+rem Install or update Pazuzu: pull, install production deps, build.
 rem Also works right after `git clone` (the pull is a no-op there).
 cd /d "%~dp0"
 

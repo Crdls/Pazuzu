@@ -6,11 +6,11 @@ const { t, te } = useI18n()
 // view settings persist in cookies, so the saved period/metric is already
 // used on the SSR render of the next visit
 const YEAR = 60 * 60 * 24 * 365
-const period = useCookie<string>('monstrata_heatmap_period', {
+const period = useCookie<string>('pazuzu_heatmap_period', {
   default: () => '24h',
   maxAge: YEAR
 })
-const metric = useCookie<string>('monstrata_heatmap_metric', {
+const metric = useCookie<string>('pazuzu_heatmap_metric', {
   default: () => 'strata:gpu_util',
   maxAge: YEAR
 })

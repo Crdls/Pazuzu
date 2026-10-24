@@ -32,7 +32,7 @@ export const neutralSwatches: ThemeSwatch[] = [
   { value: 'stone', class: 'bg-linear-to-br from-stone-300 to-stone-600' }
 ]
 
-const THEME_KEY = 'monstrata_theme'
+const THEME_KEY = 'pazuzu_theme'
 
 // the built-in scheme (standardTheme) must mirror app.config.ts ui.colors -
 // standard mode itself means "no override", so it only lives here

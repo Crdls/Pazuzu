@@ -136,7 +136,7 @@ export async function checkForUpdate (): Promise<UpdateRuntime> {
         st.error = null
       } else {
         st.error = out === null ? 'git ls-remote failed' : `branch ${st.branch} not found on origin`
-        console.warn('[monstrata] update check failed:', st.error)
+        console.warn('[pazuzu] update check failed:', st.error)
       }
     }
   } finally {

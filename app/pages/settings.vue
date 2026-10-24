@@ -112,7 +112,7 @@ async function onLangChange (value: string | number | null) {
   }
   // auto: drop the cookie and reload so i18n re-detects the browser language
   if (import.meta.client) {
-    document.cookie = 'monstrata_locale=; path=/; max-age=0'
+    document.cookie = 'pazuzu_locale=; path=/; max-age=0'
     location.reload()
   }
 }

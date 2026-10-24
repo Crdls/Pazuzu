@@ -1,5 +1,5 @@
 // Recovery tool for a lost password (no email involved - run it on the server).
-// From the project root, while the MonStrata server may keep running:
+// From the project root, while the Pazuzu server may keep running:
 //
 //   node scripts/reset-password.mjs --list
 //   node scripts/reset-password.mjs <username or id> [new password]

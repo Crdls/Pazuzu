@@ -26,7 +26,7 @@ export default defineNuxtConfig({
     defaultLocale: 'en',
     detectBrowserLanguage: {
       useCookie: true,
-      cookieKey: 'monstrata_locale',
+      cookieKey: 'pazuzu_locale',
       fallbackLocale: 'en'
     },
     locales: [

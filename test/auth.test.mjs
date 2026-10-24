@@ -32,9 +32,9 @@ check('reject malformed hash', !(await verifyPassword('whatever', 'bcrypt$1$2$3$
 check('hashToken is sha256 hex', /^[0-9a-f]{64}$/.test(hashToken('token')))
 check('hashToken differs per input', hashToken('a') !== hashToken('b'))
 
-check('cookieValue finds among others', cookieValue('a=1; monstrata_session=abc.def-12; b=2', 'monstrata_session') === 'abc.def-12')
-check('cookieValue missing name', cookieValue('a=1', 'monstrata_session') === null)
-check('cookieValue missing header', cookieValue(null, 'monstrata_session') === null)
+check('cookieValue finds among others', cookieValue('a=1; pazuzu_session=abc.def-12; b=2', 'pazuzu_session') === 'abc.def-12')
+check('cookieValue missing name', cookieValue('a=1', 'pazuzu_session') === null)
+check('cookieValue missing header', cookieValue(null, 'pazuzu_session') === null)
 check('cookieValue decodes percent-escapes', cookieValue('x=%61%62%63', 'x') === 'abc')
 check('cookieValue empty value is null', cookieValue('x=', 'x') === null)
 
