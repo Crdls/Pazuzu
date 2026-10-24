@@ -57,8 +57,8 @@ function isActive (to: string) {
       class="flex items-center gap-2 font-semibold text-highlighted px-2 py-1.5 shrink-0"
       @click="emit('dismiss')"
     >
-      <img src="/logo.svg" class="size-6" alt="" />
-      <span>MonStrata</span>
+      <img src="/logo.svg" class="size-6 glow-hover" alt="" />
+      <span>Pazuzu</span>
     </NuxtLink>
 
     <nav class="flex flex-col gap-0.5 flex-1 min-h-0 overflow-y-auto">
@@ -68,7 +68,7 @@ function isActive (to: string) {
         :to="item.to"
         class="px-3 py-1.5 rounded-md text-sm font-medium flex items-center gap-2 transition-colors whitespace-nowrap"
         :class="isActive(item.to)
-          ? 'bg-primary/10 text-primary'
+          ? 'bg-elevated text-highlighted light:bg-default'
           : 'text-muted hover:text-default hover:bg-elevated'"
         @click="emit('dismiss')"
       >
@@ -103,7 +103,7 @@ function isActive (to: string) {
         </button>
       </UTooltip>
 
-      <div class="flex items-center justify-between gap-1 -mx-3 px-3 pt-2 border-t border-default">
+      <div class="flex items-center justify-between gap-1 -mx-3 px-3 pt-2 border-t border-(--ui-bg)">
         <UTooltip :text="connected ? t('common.liveHint') : t('common.pollHint')">
           <UIcon
             :name="connected ? 'i-lucide-radio' : 'i-lucide-wifi-off'"

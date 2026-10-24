@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import type { Locale } from '#i18n'
+import type { ThemeMode } from '~/utils/theme'
 
 interface Settings {
   scrapeIntervalS: number
@@ -134,6 +135,26 @@ const neutralColor = computed({
   }
 })
 
+// the signature accent is sold as a pair: picking it also sets its palette
+function selectAccent (value: string) {
+  accentColor.value = value
+  if (value === 'abyss') neutralColor.value = 'abyssrock'
+}
+
+// color scheme: standard = built-in defaults, custom = the pickers below
+const scheme = ref<ThemeMode>('standard')
+onMounted(() => {
+  scheme.value = storedThemeMode()
+})
+const schemeItems = computed(() => [
+  { label: t('settings.colorSchemeStandard'), value: 'standard' },
+  { label: t('settings.colorSchemeCustom'), value: 'custom' }
+])
+function selectScheme (mode: string) {
+  scheme.value = mode as ThemeMode
+  setThemeMode(mode as ThemeMode)
+}
+
 // version and self-update: anyone can check, applying is admin-only while auth is on
 const { status: upd, refresh: refreshUpdate, checkNow } = useUpdate()
 const canApply = computed(() =>
@@ -212,10 +233,12 @@ async function runUpdate () {
 
 <template>
   <div class="max-w-2xl">
-    <h1 class="text-xl font-semibold mb-1">{{ t('settings.title') }}</h1>
-    <p v-if="canEditIntervals" class="text-sm text-muted mb-5">{{ t('settings.description') }}</p>
+    <div class="mb-5">
+      <h1 class="text-xl font-semibold">{{ t('settings.title') }}</h1>
+      <p v-if="canEditIntervals" class="text-sm text-muted mt-0.5">{{ t('settings.description') }}</p>
+    </div>
 
-    <UCard>
+    <UCard variant="soft" class="bg-elevated/30">
       <h2 class="text-base font-semibold mb-1">{{ t('settings.appearance') }}</h2>
       <p class="text-sm text-muted mb-4">{{ t('settings.appearanceHelp') }}</p>
       <div class="space-y-5">
@@ -227,39 +250,45 @@ async function runUpdate () {
           <USelect v-model="langModel" :items="localeItems" class="w-48" :aria-label="t('settings.language')" @update:model-value="onLangChange" />
         </UFormField>
 
-        <UFormField :label="t('settings.accentColor')">
-          <div class="flex flex-wrap gap-2.5">
-            <button
-              v-for="s in primarySwatches"
-              :key="s.value"
-              type="button"
-              class="size-6 rounded-full transition-transform hover:scale-110 focus-visible:outline-2 focus-visible:outline-primary"
-              :class="[s.class, accentColor === s.value ? 'ring-2 ring-offset-2 ring-offset-elevated ring-primary' : '']"
-              :aria-label="t(`settings.themeColor.${s.value}`)"
-              :aria-pressed="accentColor === s.value"
-              @click="accentColor = s.value"
-            />
-          </div>
+        <UFormField :label="t('settings.colorScheme')" :help="t('settings.colorSchemeHelp')">
+          <USelect :model-value="scheme" :items="schemeItems" class="w-48" :aria-label="t('settings.colorScheme')" @update:model-value="selectScheme" />
         </UFormField>
 
-        <UFormField :label="t('settings.neutralPalette')">
-          <div class="flex flex-wrap gap-2.5">
-            <button
-              v-for="s in neutralSwatches"
-              :key="s.value"
-              type="button"
-              class="size-6 rounded-full transition-transform hover:scale-110 focus-visible:outline-2 focus-visible:outline-primary"
-              :class="[s.class, neutralColor === s.value ? 'ring-2 ring-offset-2 ring-offset-elevated ring-primary' : '']"
-              :aria-label="t(`settings.themeColor.${s.value}`)"
-              :aria-pressed="neutralColor === s.value"
-              @click="neutralColor = s.value"
-            />
-          </div>
-        </UFormField>
+        <template v-if="scheme === 'custom'">
+          <UFormField :label="t('settings.accentColor')">
+            <div class="flex flex-wrap gap-2.5">
+              <button
+                v-for="s in primarySwatches"
+                :key="s.value"
+                type="button"
+                class="size-6 rounded-full transition-transform hover:scale-110 focus-visible:outline-2 focus-visible:outline-primary"
+                :class="[s.class, accentColor === s.value ? 'ring-2 ring-offset-2 ring-offset-elevated ring-primary' : '']"
+                :aria-label="t(`settings.themeColor.${s.value}`)"
+                :aria-pressed="accentColor === s.value"
+                @click="selectAccent(s.value)"
+              />
+            </div>
+          </UFormField>
+
+          <UFormField :label="t('settings.neutralPalette')">
+            <div class="flex flex-wrap gap-2.5">
+              <button
+                v-for="s in neutralSwatches"
+                :key="s.value"
+                type="button"
+                class="size-6 rounded-full transition-transform hover:scale-110 focus-visible:outline-2 focus-visible:outline-primary"
+                :class="[s.class, neutralColor === s.value ? 'ring-2 ring-offset-2 ring-offset-elevated ring-primary' : '']"
+                :aria-label="t(`settings.themeColor.${s.value}`)"
+                :aria-pressed="neutralColor === s.value"
+                @click="neutralColor = s.value"
+              />
+            </div>
+          </UFormField>
+        </template>
       </div>
     </UCard>
 
-    <UCard v-if="canEditIntervals" class="mt-6">
+    <UCard v-if="canEditIntervals" variant="soft" class="mt-6 bg-elevated/30">
       <form class="space-y-5" @submit.prevent="save">
         <UFormField :label="t('settings.scrape')" :help="t('settings.scrapeHelp')">
           <UInputNumber v-model="form.scrapeIntervalS" :min="2" :max="600" :step="1" class="w-40" />
@@ -285,7 +314,7 @@ async function runUpdate () {
       </form>
     </UCard>
 
-    <UCard v-if="authed" class="mt-6">
+    <UCard v-if="authed" variant="soft" class="mt-6 bg-elevated/30">
       <h2 class="text-base font-semibold mb-1">{{ hasPassword ? t('auth.changePassword') : t('auth.setPassword') }}</h2>
       <p class="text-sm text-muted mb-4">{{ hasPassword ? t('auth.changePasswordHint') : t('auth.setPasswordHint') }}</p>
       <form class="space-y-5" @submit.prevent="changePassword">
@@ -316,7 +345,7 @@ async function runUpdate () {
       </form>
     </UCard>
 
-    <UCard class="mt-6">
+    <UCard variant="soft" class="mt-6 bg-elevated/30">
       <h2 class="text-base font-semibold mb-1">{{ t('update.title') }}</h2>
       <p class="text-sm text-muted mb-4">{{ t('update.description') }}</p>
 

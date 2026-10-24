@@ -1,25 +1,24 @@
 <script setup lang="ts">
-const { servers, connected, ready } = useLive()
+const { servers, ready } = useLive()
 const { t } = useI18n()
+const { status, isAdmin } = useAuth()
+// the quick-add row replaces the old page title; visibility mirrors the sidebar
+const showClients = computed(() => !status.value?.authEnabled || isAdmin.value)
+const showUsers = computed(() => Boolean(status.value?.authEnabled && isAdmin.value))
 </script>
 
 <template>
   <div>
-    <div class="flex items-center justify-between mb-5">
-      <h1 class="text-xl font-semibold">{{ t('dashboard.title') }}</h1>
-      <div class="flex items-center gap-2">
-        <UBadge
-          :color="connected ? 'success' : 'neutral'"
-          variant="subtle"
-          size="sm"
-          :icon="connected ? 'i-lucide-radio' : 'i-lucide-wifi-off'"
-        >
-          {{ connected ? t('common.live') : t('common.polling') }}
-        </UBadge>
-        <UButton to="/servers?add=1" color="neutral" variant="outline" size="sm" icon="i-lucide-plus">
-          {{ t('common.addServer') }}
-        </UButton>
-      </div>
+    <div class="flex items-center flex-wrap gap-2 mb-5">
+      <UButton to="/servers?add=1" color="neutral" variant="outline" icon="i-lucide-plus" class="shrink-0">
+        {{ t('common.addServer') }}
+      </UButton>
+      <UButton v-if="showClients" to="/clients?add=1" color="neutral" variant="outline" icon="i-lucide-plus" class="shrink-0">
+        {{ t('clients.add') }}
+      </UButton>
+      <UButton v-if="showUsers" to="/users?add=1" color="neutral" variant="outline" icon="i-lucide-plus" class="shrink-0">
+        {{ t('users.add') }}
+      </UButton>
     </div>
 
     <div v-if="!ready" class="flex items-center justify-center py-20">
@@ -27,7 +26,7 @@ const { t } = useI18n()
     </div>
 
     <div v-else-if="servers.length === 0" class="flex flex-col items-center justify-center py-20 text-center">
-      <UIcon name="i-lucide-server" class="size-12 text-muted mb-4" />
+      <AbyssEyes class="size-12 mb-4" />
       <h2 class="text-lg font-semibold mb-1">{{ t('dashboard.emptyTitle') }}</h2>
       <p class="text-sm text-muted mb-4 max-w-md">
         {{ t('dashboard.emptyText') }}

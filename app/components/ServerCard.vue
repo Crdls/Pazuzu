@@ -54,14 +54,19 @@ const lastScrape = computed(() => {
 </script>
 
 <template>
-  <UCard>
+  <!-- filled, borderless card: a thin shade lighter than the page (dark) -->
+  <UCard variant="soft" class="bg-elevated/30">
     <template #header>
       <div class="flex items-center justify-between gap-2">
         <div class="min-w-0">
-          <NuxtLink :to="`/servers/${server.id}`" class="font-semibold hover:text-primary truncate block">
-            {{ server.name }}
-          </NuxtLink>
-          <div class="text-xs text-muted truncate">{{ server.url }}</div>
+          <!-- name + address share one neutral button (the slot replaces
+               UButton's label, so the two lines need their own container) -->
+          <UButton :to="`/servers/${server.id}`" color="neutral" variant="soft" class="max-w-full">
+            <span class="flex flex-col items-start min-w-0">
+              <span class="font-semibold max-w-full truncate">{{ server.name }}</span>
+              <span class="text-[11px] font-normal font-mono text-muted max-w-full truncate">{{ server.url }}</span>
+            </span>
+          </UButton>
         </div>
         <div class="flex items-center gap-1.5 shrink-0">
           <StateBadge :server="server" />
@@ -93,9 +98,9 @@ const lastScrape = computed(() => {
         </div>
       </div>
 
-      <!-- per-GPU -->
-      <div class="space-y-2">
-        <div v-for="g in gpus" :key="g.gpu" class="space-y-1">
+      <!-- per-GPU: roomy gaps - pairs kept tight, GPUs spaced apart -->
+      <div class="space-y-4">
+        <div v-for="g in gpus" :key="g.gpu" class="space-y-2">
           <GaugeBar
             :value="g.util"
             :label="`GPU ${g.gpu}`"

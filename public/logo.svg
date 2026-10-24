@@ -21,7 +21,7 @@
   <path d="M 15 36 C 22 37.5 42 37.5 49 36 C 47 46 40 51 32 51 C 24 51 17 46 15 36 Z" fill="#fff8e7"/>
   <!-- bite line = load chart, clipped to the mouth -->
   <g clip-path="url(#mouth9)">
-    <path d="M 15.8 36.2 L 19 45.3 L 21.6 36.5 L 24.2 49.4 L 26.8 36.5 L 29.4 50.9 L 32 36.5 L 34.6 51.1 L 37.2 36.5 L 39.8 50.2 L 42.4 36.5 L 45 45.5 L 48.2 36.2" fill="none" stroke="#10b981" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
+    <path d="M 15.8 36.2 L 19 45.3 L 21.6 36.5 L 24.2 49.4 L 26.8 36.5 L 29.4 50.9 L 32 36.5 L 34.6 51.1 L 37.2 36.5 L 39.8 50.2 L 42.4 36.5 L 45 45.5 L 48.2 36.2" fill="none" stroke="#33b9c9" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
   </g>
 </svg>
 

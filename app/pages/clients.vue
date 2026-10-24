@@ -104,6 +104,16 @@ function openAdd () {
   addOpen.value = true
 }
 
+// ?add=1 from the dashboard opens the form immediately
+const route = useRoute()
+const router = useRouter()
+onMounted(() => {
+  if (route.query.add) {
+    openAdd()
+    void router.replace({ query: { ...route.query, add: undefined } })
+  }
+})
+
 async function createClient () {
   saving.value = true
   try {
@@ -242,7 +252,7 @@ function priorityColor (p: string): 'error' | 'primary' | 'neutral' {
         <h1 class="text-xl font-semibold">{{ t('clients.title') }}</h1>
         <p class="text-sm text-muted mt-0.5">{{ t('clients.subtitle') }}</p>
       </div>
-      <UButton icon="i-lucide-plus" size="sm" @click="openAdd">
+      <UButton color="neutral" variant="outline" icon="i-lucide-plus" @click="openAdd">
         {{ t('clients.add') }}
       </UButton>
     </div>
@@ -256,8 +266,8 @@ function priorityColor (p: string): 'error' | 'primary' | 'neutral' {
       :title="t('gateway.disabledBanner')"
     />
 
-    <!-- live gateway status -->
-    <UCard v-if="gw" class="mb-5">
+    <!-- live gateway status: plain block, no card - the server tiles carry it -->
+    <div v-if="gw" class="mb-5 space-y-3">
       <div class="flex flex-wrap gap-x-8 gap-y-3 text-sm">
         <div>
           <div class="text-xs uppercase tracking-wide text-muted mb-1">{{ t('gateway.endpoint') }}</div>
@@ -274,11 +284,11 @@ function priorityColor (p: string): 'error' | 'primary' | 'neutral' {
           </div>
         </div>
       </div>
-      <div class="mt-3 border-t border-default pt-3">
+      <div class="border-t border-default pt-3">
         <div class="text-xs uppercase tracking-wide text-muted mb-2">{{ t('gateway.serversTitle') }}</div>
         <div v-if="!gw.servers.length" class="text-sm text-muted">{{ t('gateway.noServers') }}</div>
         <div v-else class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-2.5">
-          <div v-for="s in gw.servers" :key="s.id" class="rounded-lg border border-default bg-elevated/30 p-3 space-y-2.5">
+          <div v-for="s in gw.servers" :key="s.id" class="rounded-lg bg-elevated/50 p-3 space-y-2.5">
             <div class="flex items-center gap-1.5 min-w-0">
               <UIcon
                 :name="s.up ? 'i-lucide-circle-check' : 'i-lucide-circle-x'"
@@ -309,9 +319,9 @@ function priorityColor (p: string): 'error' | 'primary' | 'neutral' {
           </div>
         </div>
       </div>
-    </UCard>
+    </div>
 
-    <UCard>
+    <UCard variant="soft" class="bg-elevated/30">
       <table class="w-full text-sm">
         <thead>
           <tr class="text-left text-xs uppercase tracking-wide text-muted border-b border-default">
@@ -367,7 +377,8 @@ function priorityColor (p: string): 'error' | 'primary' | 'neutral' {
           </tr>
           <tr v-if="!clients?.length">
             <td colspan="8" class="py-10 text-center text-muted">
-              {{ t('clients.empty') }}
+              <AbyssEyes class="size-9 mx-auto mb-2" />
+              <div>{{ t('clients.empty') }}</div>
             </td>
           </tr>
         </tbody>

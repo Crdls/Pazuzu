@@ -34,14 +34,20 @@ const maxValue = computed(() => {
   return max > 0 ? max : 1
 })
 
+// sonar ramp: idle cold abyss teal -> coral-red heat, light enough to
+// glow on the dark background without washing out on white
+function heatColor (r: number): string {
+  return `hsl(${Math.round(190 - 190 * r)} ${Math.round(70 + 8 * r)}% ${Math.round(48 + 6 * r)}%)`
+}
+
 function colorFor (v: number | null): string | undefined {
   if (v === null || !Number.isFinite(v)) return undefined
   const r = Math.min(1, Math.max(0, (v * props.data.scale) / maxValue.value))
-  return `hsl(${Math.round(140 - 140 * r)} 65% 45%)`
+  return heatColor(r)
 }
 
 const legendGradient = computed(() => {
-  const stops = Array.from({ length: 11 }, (_, i) => `hsl(${140 - 14 * i} 65% 45%) ${i * 10}%`)
+  const stops = Array.from({ length: 11 }, (_, i) => `${heatColor(i / 10)} ${i * 10}%`)
   return `linear-gradient(to right, ${stops.join(', ')})`
 })
 

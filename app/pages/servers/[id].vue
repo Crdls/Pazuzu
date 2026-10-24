@@ -115,7 +115,7 @@ onBeforeUnmount(() => { if (timer) clearInterval(timer) })
           :scale="chart.scale"
         />
         <template #fallback>
-          <UCard>
+          <UCard variant="soft" class="bg-elevated/30">
             <div class="h-48 flex items-center justify-center text-sm text-muted">
               {{ chart.title }}
             </div>

@@ -75,7 +75,7 @@ const metricItems = computed(() =>
       class="mb-4"
     />
 
-    <UCard>
+    <UCard variant="soft" class="bg-elevated/30">
       <div v-if="pending && !data" class="h-40 flex items-center justify-center">
         <UIcon name="i-lucide-loader-circle" class="size-6 animate-spin text-muted" />
       </div>

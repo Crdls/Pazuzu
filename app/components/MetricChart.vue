@@ -17,7 +17,8 @@ const props = withDefaults(defineProps<{
 
 const { t } = useI18n()
 
-const COLORS = ['#10b981', '#3b82f6', '#f59e0b', '#ef4444', '#8b5cf6', '#06b6d4', '#ec4899', '#84cc16']
+// series palette: bioluminescent inks that glow on the Abyss dark background
+const COLORS = ['#33b9c9', '#fbbf24', '#f472b6', '#a3e635', '#fb7185', '#a78bfa', '#34d399', '#60a5fa']
 
 const el = ref<HTMLDivElement>()
 const hasData = computed(() => props.series.some(s => s.points.length > 0))
@@ -135,7 +136,7 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <UCard>
+  <UCard variant="soft" class="bg-elevated/30">
     <template #header>
       <div class="flex items-baseline justify-between gap-2">
         <h3 class="text-sm font-semibold">{{ title }}</h3>

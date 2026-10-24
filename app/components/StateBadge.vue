@@ -31,7 +31,7 @@ function parseState (labels: string): string {
     color="neutral"
     variant="subtle"
     icon="i-lucide-ban"
-    size="sm"
+    size="md"
   >
     {{ t('state.disabled') }}
   </UBadge>
@@ -40,7 +40,7 @@ function parseState (labels: string): string {
     :color="state.color as any"
     variant="subtle"
     :icon="state.icon"
-    size="sm"
+    size="md"
   >
     {{ t(state.label) }}
   </UBadge>
@@ -49,7 +49,7 @@ function parseState (labels: string): string {
     color="error"
     variant="subtle"
     icon="i-lucide-plug-zap"
-    size="sm"
+    size="md"
   >
     {{ t('state.down') }}
   </UBadge>

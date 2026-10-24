@@ -185,12 +185,12 @@ onBeforeUnmount(() => { if (timer) clearInterval(timer) })
         <h1 class="text-xl font-semibold">{{ t('servers.title') }}</h1>
         <p class="text-sm text-muted mt-0.5">{{ t('servers.subtitle') }}</p>
       </div>
-      <UButton icon="i-lucide-plus" size="sm" @click="openAdd">
+      <UButton color="neutral" variant="outline" icon="i-lucide-plus" @click="openAdd">
         {{ t('common.addServer') }}
       </UButton>
     </div>
 
-    <UCard>
+    <UCard variant="soft" class="bg-elevated/30">
       <table class="w-full text-sm">
         <thead>
           <tr class="text-left text-xs uppercase tracking-wide text-muted border-b border-default">
@@ -279,7 +279,8 @@ onBeforeUnmount(() => { if (timer) clearInterval(timer) })
           </tr>
           <tr v-if="!servers?.length">
             <td colspan="6" class="py-10 text-center text-muted">
-              {{ t('servers.empty') }}
+              <AbyssEyes class="size-9 mx-auto mb-2" />
+              <div>{{ t('servers.empty') }}</div>
             </td>
           </tr>
         </tbody>

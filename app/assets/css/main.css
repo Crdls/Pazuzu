@@ -6,6 +6,112 @@
    app/plugins/theme-color.ts). Do not set --ui-primary itself: that
    variable must hold a concrete color value, not a palette name. */
 
+/* Light canvas: Nuxt UI hardcodes --ui-bg:#fff; the inverted experiment -
+   canvas is the darkest layer, the aside and cards float above it on white
+   alpha. Unlayered beats the plugin's .dark, so dark is restored
+   explicitly. */
+:root {
+  --ui-bg: color-mix(in oklab, var(--color-abyssrock-500) 20%, white);
+}
+.dark {
+  --ui-bg: var(--ui-color-neutral-900);
+}
+
+/* Light text: on the tinted canvas the stock light tokens fall below AA.
+   Push every level a shade or two down the abyssrock scale; .dark must
+   restate the built-ins because this unlayered rule outranks them. */
+:root {
+  --ui-text-dimmed: var(--color-abyssrock-600);
+  --ui-text-muted: var(--color-abyssrock-600);
+  --ui-text-toned: var(--color-abyssrock-700);
+  --ui-text: var(--color-abyssrock-800);
+  --ui-text-highlighted: var(--color-abyssrock-950);
+}
+.dark {
+  --ui-text-dimmed: var(--ui-color-neutral-500);
+  --ui-text-muted: var(--ui-color-neutral-400);
+  --ui-text-toned: var(--ui-color-neutral-300);
+  --ui-text: var(--ui-color-neutral-200);
+  --ui-text-highlighted: #fff;
+}
+
+/* Light-mode cards: near-white abyss plates floating on the darkened canvas */
+.light .bg-elevated\/30 {
+  background-color: color-mix(in oklab, var(--color-abyssrock-50) 85%, transparent);
+}
+
+/* Buttons/badges: Nuxt UI sets flex-wrap on the root, so in narrow flex
+   parents the icon and label can split onto two lines. Keep every action
+   on one line everywhere (cards, tables, modals). */
+[data-slot="base"] {
+  flex-wrap: nowrap;
+}
+[data-slot="base"] [data-slot="label"] {
+  flex-shrink: 0;
+}
+/* slot-provided text (no label slot) is an anonymous flex item that shrinks
+   to min-content and wraps - buttons and links keep their text on one line */
+button[data-slot="base"],
+a[data-slot="base"] {
+  white-space: nowrap;
+}
+
+/* Cards: UCard puts p-4 sm:px-6 on header/footer, so vertical padding
+   lags the 24px sides at >=sm. Equalize it to the horizontal value; body
+   is already p-6. Portaled overlays (modal, slideover, toast) sit outside
+   <main> and keep their own padding. */
+@media (min-width: 40rem) {
+  main [data-slot="header"],
+  main [data-slot="footer"] {
+    padding: calc(var(--spacing) * 6);
+  }
+}
+
+/* Signature "Abyss" theme: a bioluminescent accent (abyss) over deep-sea
+   rock neutrals (abyssrock). `static` keeps every shade in the output —
+   the Nuxt UI colors runtime plugin reads --color-<name>-<shade> through
+   var(), which the Tailwind scanner cannot see. Light shades stay neutral
+   enough for the light mode; the dark 700-950 carry the blue-teal tint. */
+@theme static {
+  --color-abyss-50: #f0fafb;
+  --color-abyss-100: #d3eff3;
+  --color-abyss-200: #a8dce4;
+  --color-abyss-300: #6ccfdb;
+  --color-abyss-400: #33b9c9;
+  --color-abyss-500: #1c98ad;
+  --color-abyss-600: #1e7f92;
+  --color-abyss-700: #1d6676;
+  --color-abyss-800: #1e5361;
+  --color-abyss-900: #1b444f;
+  --color-abyss-950: #0d2c34;
+
+  --color-abyssrock-50: #f4f7f9;
+  --color-abyssrock-100: #e7edf1;
+  --color-abyssrock-200: #cdd9e2;
+  --color-abyssrock-300: #a6b9c9;
+  --color-abyssrock-400: #7f97ab;
+  --color-abyssrock-500: #5f7a90;
+  --color-abyssrock-600: #4a6175;
+  --color-abyssrock-700: #394c5d;
+  --color-abyssrock-800: #24313e;
+  --color-abyssrock-900: #111921;
+  --color-abyssrock-950: #0b1219;
+}
+
+/* the signature theme's swatch in Settings: a lure glow deep in the dark */
+.swatch-abyss {
+  background: radial-gradient(circle at 50% 42%, var(--color-abyss-300) 0%, var(--color-abyss-700) 45%, var(--color-abyssrock-950) 100%);
+}
+
+/* Faint bioluminescence accents (driven by --ui-primary, so they follow
+   any accent the user picks): hoverable logos. */
+.glow-hover {
+  transition: filter 0.2s ease;
+}
+.glow-hover:hover {
+  filter: drop-shadow(0 0 6px color-mix(in oklab, var(--ui-primary) 70%, transparent));
+}
+
 /* Always reserve the scrollbar gutter so content never shifts sideways
    when a page grows past one viewport or a modal locks the scroll.
    color-scheme makes native scrollbars/controls match the theme at once. */

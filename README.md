@@ -31,11 +31,14 @@ with selectable period.
   every 6 hours, and Settings → Updates pulls, rebuilds and restarts the
   server in one click (admins while auth is on).
 - **Theme** — light / dark / system: quick toggle in the sidebar (a drawer
-  on mobile) or a selector in Settings; accent and neutral palettes
-  selectable in Settings; stored per browser (localStorage).
-- **Mascot** — a horned grinning monster whose smile is a green load-chart
+  on mobile) or a selector in Settings; the color scheme is Standard
+  (built-in defaults: an intense bioluminescent cyan accent over
+  deep-sea rock neutrals) or
+  Custom (accent and neutral palettes picked per browser, localStorage).
+- **Mascot** — a horned grinning monster whose smile is a cyan load-chart
   zigzag: `public/logo.svg` in the sidebar and on the login page,
-  `public/favicon.svg` as the tab icon.
+  `public/favicon.svg` as the tab icon; empty states are watched by a pair
+  of glowing eyes (`AbyssEyes.vue`).
 - **i18n** — UI in English, Russian, German, Spanish, French and Chinese;
   language is auto-detected from the browser and can be pinned per account
   in Settings (the `monstrata_locale` cookie remembers the choice until a

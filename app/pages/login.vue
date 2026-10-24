@@ -69,11 +69,11 @@ async function submit () {
   <div class="min-h-screen bg-default flex flex-col items-center justify-center p-4">
     <div class="w-full max-w-sm">
       <div class="flex items-center justify-center gap-2 font-semibold text-highlighted mb-6">
-        <img src="/logo.svg" class="size-10" alt="" />
+        <img src="/logo.svg" class="size-10 glow-hover" alt="" />
         <span class="text-lg">MonStrata</span>
       </div>
 
-      <UCard>
+      <UCard variant="soft" class="bg-elevated/30">
         <h1 class="text-lg font-semibold mb-1">
           {{ mode === 'setup' ? t('auth.setupTitle') : t('auth.signInTitle') }}
         </h1>

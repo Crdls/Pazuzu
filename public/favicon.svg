@@ -21,7 +21,7 @@
   <path d="M 15.5 35 C 22 36.5 42 36.5 48.5 35 C 46.5 45 39.5 50.5 32 50.5 C 24.5 50.5 17.5 45 15.5 35 Z" fill="#fff8e7"/>
   <!-- bite zigzag chart -->
   <g clip-path="url(#mouthF9)">
-    <path d="M 16 34.9 L 20.5 46.3 L 24 35.6 L 28 50.2 L 32 35.7 L 36 50.1 L 40 35.6 L 43.5 46.5 L 48 34.9" fill="none" stroke="#10b981" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+    <path d="M 16 34.9 L 20.5 46.3 L 24 35.6 L 28 50.2 L 32 35.7 L 36 50.1 L 40 35.6 L 43.5 46.5 L 48 34.9" fill="none" stroke="#33b9c9" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
   </g>
 </svg>
 

@@ -65,8 +65,53 @@ async function save () {
   }
 }
 
-const deleteTarget = ref<UserRow | null>(null)
+// add modal: new login/password account, role defaults to user
+const route = useRoute()
+const router = useRouter()
+const addOpen = ref(false)
+const addForm = reactive({ username: '', password: '', confirm: '', role: 'user' as 'admin' | 'user' })
+const addSaving = ref(false)
+const addMismatch = computed(() => addForm.confirm.length > 0 && addForm.confirm !== addForm.password)
 
+function openAdd () {
+  addForm.username = ''
+  addForm.password = ''
+  addForm.confirm = ''
+  addForm.role = 'user'
+  addOpen.value = true
+}
+
+// ?add=1 from the dashboard opens the form immediately
+onMounted(() => {
+  if (route.query.add) {
+    openAdd()
+    void router.replace({ query: { ...route.query, add: undefined } })
+  }
+})
+
+async function create () {
+  if (addMismatch.value) return
+  addSaving.value = true
+  try {
+    await $fetch('/api/users', {
+      method: 'POST',
+      body: { username: addForm.username, password: addForm.password, role: addForm.role }
+    })
+    addOpen.value = false
+    toast.add({ title: t('users.toastSaved'), color: 'success' })
+    await refresh()
+  } catch (err: unknown) {
+    toast.add({
+      title: t('users.toastSaveFailed'),
+      description: (err as { statusMessage?: string })?.statusMessage ?? String(err),
+      color: 'error'
+    })
+  } finally {
+    addSaving.value = false
+  }
+}
+
+const deleteTarget = ref<UserRow | null>(null)
 async function remove () {
   if (!deleteTarget.value) return
   try {
@@ -87,12 +132,17 @@ async function remove () {
 
 <template>
   <div>
-    <div class="mb-5">
-      <h1 class="text-xl font-semibold">{{ t('users.title') }}</h1>
-      <p class="text-sm text-muted mt-0.5">{{ t('users.subtitle') }}</p>
+    <div class="flex items-center justify-between mb-5">
+      <div>
+        <h1 class="text-xl font-semibold">{{ t('users.title') }}</h1>
+        <p class="text-sm text-muted mt-0.5">{{ t('users.subtitle') }}</p>
+      </div>
+      <UButton color="neutral" variant="outline" icon="i-lucide-plus" @click="openAdd">
+        {{ t('users.add') }}
+      </UButton>
     </div>
 
-    <UCard>
+    <UCard variant="soft" class="bg-elevated/30">
       <table class="w-full text-sm">
         <thead>
           <tr class="text-left text-xs uppercase tracking-wide text-muted border-b border-default">
@@ -146,7 +196,8 @@ async function remove () {
           </tr>
           <tr v-if="!users?.length">
             <td colspan="6" class="py-10 text-center text-muted">
-              {{ t('users.empty') }}
+              <AbyssEyes class="size-9 mx-auto mb-2" />
+              <div>{{ t('users.empty') }}</div>
             </td>
           </tr>
         </tbody>
@@ -186,6 +237,45 @@ async function remove () {
               {{ t('common.cancel') }}
             </UButton>
             <UButton type="submit" :loading="saving" :disabled="pwdMismatch">
+              {{ t('common.save') }}
+            </UButton>
+          </div>
+        </form>
+      </template>
+    </UModal>
+
+    <!-- add modal -->
+    <UModal v-model:open="addOpen" :title="t('users.addTitle')">
+      <template #body>
+        <form class="space-y-4" @submit.prevent="create">
+          <UFormField :label="t('users.username')">
+            <UInput v-model="addForm.username" autocomplete="username" class="w-full" />
+          </UFormField>
+
+          <UFormField :label="t('users.role')">
+            <USelect v-model="addForm.role" :items="roleItems" class="w-40" />
+          </UFormField>
+
+          <UFormField :label="t('users.newPassword')" :help="t('users.newPasswordHelp')">
+            <UInput v-model="addForm.password" type="password" autocomplete="new-password" class="w-full" />
+          </UFormField>
+
+          <UFormField :label="t('users.confirmNewPassword')">
+            <UInput
+              v-model="addForm.confirm"
+              type="password"
+              autocomplete="new-password"
+              class="w-full"
+              :color="addMismatch ? 'error' : undefined"
+            />
+            <p v-if="addMismatch" class="text-xs text-error mt-1">{{ t('auth.mismatch') }}</p>
+          </UFormField>
+
+          <div class="flex justify-end gap-2 pt-2">
+            <UButton color="neutral" variant="ghost" @click="addOpen = false">
+              {{ t('common.cancel') }}
+            </UButton>
+            <UButton type="submit" :loading="addSaving" :disabled="!addForm.username || !addForm.password || addMismatch">
               {{ t('common.save') }}
             </UButton>
           </div>
