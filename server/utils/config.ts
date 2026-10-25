@@ -1,11 +1,13 @@
-import { readFileSync, statSync } from 'node:fs'
-import { resolve } from 'node:path'
+import { mkdirSync, readFileSync, renameSync, statSync, writeFileSync } from 'node:fs'
+import { dirname, resolve } from 'node:path'
 import { runtime } from './runtime.ts'
 
 /**
  * System-level settings kept in `config.json` next to the project root —
- * unlike the scrape settings in the DB these are intentionally NOT editable
- * from the UI (you need filesystem access to change them, see README).
+ * unlike the scrape settings in the DB these are edited by admins only:
+ * the Settings page reads and writes them through `/api/config`, whose only
+ * writer is `saveConfig` below (hand-editing the file stays supported).
+ * `db.path` still applies only when the DB opens at startup.
  * This file is reachable from bare Node (via db.ts), keep relative imports
  * with explicit `.ts` extensions.
  */
@@ -66,6 +68,16 @@ export const GATEWAY_DEFAULTS: GatewayConfig = {
   ejectionS: 30
 }
 
+/** ranges of the numeric gateway knobs, shared by file parsing and UI validation */
+const GATEWAY_LIMITS: Record<Exclude<keyof GatewayConfig, 'enabled'>, [number, number]> = {
+  queueTimeoutS: [1, 3600],
+  queueMax: [1, 10000],
+  queueMaxPerClient: [1, 1000],
+  sessionIdleMin: [1, 43200],
+  defaultCapacity: [1, 4096],
+  ejectionS: [1, 3600]
+}
+
 export const CONFIG_DEFAULTS: AppConfig = {
   db: { path: 'data/data.db' },
   auth: {
@@ -114,16 +126,12 @@ function numRange (raw: unknown, def: number, min: number, max: number): number 
 
 function parseGateway (raw: unknown): GatewayConfig {
   const g = raw as Record<string, unknown> | undefined
-  const d = GATEWAY_DEFAULTS
-  return {
-    enabled: g?.enabled === true,
-    queueTimeoutS: numRange(g?.queueTimeoutS, d.queueTimeoutS, 1, 3600),
-    queueMax: numRange(g?.queueMax, d.queueMax, 1, 10000),
-    queueMaxPerClient: numRange(g?.queueMaxPerClient, d.queueMaxPerClient, 1, 1000),
-    sessionIdleMin: numRange(g?.sessionIdleMin, d.sessionIdleMin, 1, 43200),
-    defaultCapacity: numRange(g?.defaultCapacity, d.defaultCapacity, 1, 4096),
-    ejectionS: numRange(g?.ejectionS, d.ejectionS, 1, 3600)
+  const gw = { enabled: g?.enabled === true } as GatewayConfig
+  for (const key of Object.keys(GATEWAY_LIMITS) as Array<keyof typeof GATEWAY_LIMITS>) {
+    const [min, max] = GATEWAY_LIMITS[key]!
+    gw[key] = numRange(g?.[key], GATEWAY_DEFAULTS[key], min, max)
   }
+  return gw
 }
 
 export function parseConfig (text: string | null): AppConfig {
@@ -171,4 +179,127 @@ export function loadConfig (): AppConfig {
     rt.config = { mtime, value }
   }
   return rt.config.value
+}
+
+/** Raw text of the current config file; null when it is absent or unreadable. */
+export function readConfigText (): string | null {
+  try {
+    return readFileSync(configPath(), 'utf8')
+  } catch {
+    return null
+  }
+}
+
+function valStr (raw: unknown, key: string, errors: string[]): string {
+  if (typeof raw !== 'string') {
+    errors.push(`${key}: string expected`)
+    return ''
+  }
+  return raw.trim()
+}
+
+function valBool (raw: unknown, key: string, errors: string[]): boolean {
+  if (typeof raw !== 'boolean') {
+    errors.push(`${key}: true or false expected`)
+    return false
+  }
+  return raw
+}
+
+export interface ConfigValidation {
+  errors: string[]
+  /** normalized config, only meaningful when `errors` is empty */
+  config: AppConfig
+}
+
+/**
+ * Strict counterpart of parseConfig for the admin UI form: instead of
+ * silently falling back to defaults, every bad value is reported in errors.
+ */
+export function validateConfigInput (body: unknown): ConfigValidation {
+  const errors: string[] = []
+  const src = (body ?? {}) as Record<string, unknown>
+  const dbRaw = (src.db ?? {}) as Record<string, unknown>
+  const authRaw = (src.auth ?? {}) as Record<string, unknown>
+  const glRaw = (authRaw.gitlab ?? {}) as Record<string, unknown>
+  const gwRaw = (src.gateway ?? {}) as Record<string, unknown>
+
+  const dbPath = valStr(dbRaw.path, 'db.path', errors)
+  if (dbPath === '') errors.push('db.path: cannot be empty')
+
+  if (!Array.isArray(glRaw.allowedGroups)) errors.push('auth.gitlab.allowedGroups: array expected')
+  const gitlab: GitlabAuth = {
+    enabled: valBool(glRaw.enabled, 'auth.gitlab.enabled', errors),
+    baseUrl: valStr(glRaw.baseUrl, 'auth.gitlab.baseUrl', errors).replace(/\/+$/, ''),
+    clientId: valStr(glRaw.clientId, 'auth.gitlab.clientId', errors),
+    clientSecret: valStr(glRaw.clientSecret, 'auth.gitlab.clientSecret', errors),
+    redirectUri: valStr(glRaw.redirectUri, 'auth.gitlab.redirectUri', errors),
+    allowedGroups: Array.isArray(glRaw.allowedGroups)
+      ? (glRaw.allowedGroups as unknown[]).map(str).filter(s => s !== '')
+      : [],
+    caCert: valStr(glRaw.caCert, 'auth.gitlab.caCert', errors),
+    insecureTls: valBool(glRaw.insecureTls, 'auth.gitlab.insecureTls', errors)
+  }
+  if (gitlab.enabled && (gitlab.baseUrl === '' || gitlab.clientId === '' || gitlab.clientSecret === '')) {
+    errors.push('auth.gitlab: baseUrl, clientId and clientSecret are required when it is enabled')
+  }
+
+  const gateway = { enabled: valBool(gwRaw.enabled, 'gateway.enabled', errors) } as GatewayConfig
+  for (const key of Object.keys(GATEWAY_LIMITS) as Array<keyof typeof GATEWAY_LIMITS>) {
+    const [min, max] = GATEWAY_LIMITS[key]!
+    const raw = gwRaw[key]
+    const n = typeof raw === 'number' ? Math.round(raw) : NaN
+    if (!Number.isFinite(n) || n < min || n > max) {
+      errors.push(`gateway.${key}: whole number between ${min} and ${max} expected`)
+      gateway[key] = GATEWAY_DEFAULTS[key]
+    } else {
+      gateway[key] = n
+    }
+  }
+
+  return {
+    errors,
+    config: {
+      db: { path: dbPath },
+      auth: { enabled: valBool(authRaw.enabled, 'auth.enabled', errors), gitlab },
+      gateway
+    }
+  }
+}
+
+/**
+ * Serialize `cfg` onto the existing file text: the known fields are rewritten
+ * from the form, keys this version of Pazuzu does not know about survive the
+ * round trip. Unparsable existing text is replaced with a clean file.
+ */
+export function mergeConfigText (existing: string | null, cfg: AppConfig): string {
+  let raw: Record<string, unknown> = {}
+  if (existing) {
+    try {
+      const parsed = JSON.parse(existing) as unknown
+      if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) raw = parsed as Record<string, unknown>
+    } catch { /* hand-broken file: write a clean one */ }
+  }
+  const obj = (v: unknown): Record<string, unknown> =>
+    v && typeof v === 'object' && !Array.isArray(v) ? v as Record<string, unknown> : {}
+  const db = { ...obj(raw.db), path: cfg.db.path }
+  const gitlab = { ...obj(obj(raw.auth).gitlab), ...cfg.auth.gitlab }
+  const auth = { ...obj(raw.auth), enabled: cfg.auth.enabled, gitlab }
+  const gateway = { ...obj(raw.gateway), ...cfg.gateway }
+  return JSON.stringify({ ...raw, db, auth, gateway }, null, 2) + '\n'
+}
+
+/**
+ * Write config.json from the admin UI: atomic replace (tmp + rename),
+ * unknown keys kept, and the mtime cache dropped so `loadConfig()` returns
+ * the new values right away. Returns the freshly loaded config.
+ */
+export function saveConfig (cfg: AppConfig): AppConfig {
+  const path = configPath()
+  mkdirSync(dirname(path), { recursive: true })
+  const tmp = `${path}.${process.pid}.tmp`
+  writeFileSync(tmp, mergeConfigText(readConfigText(), cfg))
+  renameSync(tmp, path)
+  runtime().config = undefined
+  return loadConfig()
 }

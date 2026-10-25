@@ -1,10 +1,10 @@
 // Smoke test for config.json loading (defaults, partial files, invalid input).
 // Run: node test/config.test.mjs
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { setTimeout as sleep } from 'node:timers/promises'
-import { CONFIG_DEFAULTS, isGitlabReady, loadConfig } from '../server/utils/config.ts'
+import { CONFIG_DEFAULTS, isGitlabReady, loadConfig, mergeConfigText, saveConfig, validateConfigInput } from '../server/utils/config.ts'
 
 let failed = 0
 function check (name, cond) {
@@ -72,6 +72,44 @@ await write(JSON.stringify({ gateway: { queueTimeoutS: 'nope', queueMax: -3, que
 cfg = loadConfig()
 check('gateway stays off unless explicitly enabled', cfg.gateway.enabled === false)
 check('gateway bad numbers fall back to defaults', cfg.gateway.queueTimeoutS === CONFIG_DEFAULTS.gateway.queueTimeoutS && cfg.gateway.queueMax === CONFIG_DEFAULTS.gateway.queueMax && cfg.gateway.queueMaxPerClient === CONFIG_DEFAULTS.gateway.queueMaxPerClient)
+
+// --- admin UI round trip: validate, merge over hand-edits, save live ---
+const merged = JSON.parse(mergeConfigText('{"strange":{"a":1},"gateway":{"extra":"keep","queueMax":5}}', {
+  db: { path: 'p.db' }, auth: { enabled: true, gitlab: CONFIG_DEFAULTS.auth.gitlab }, gateway: { ...CONFIG_DEFAULTS.gateway, queueMax: 7 }
+}))
+check('merge keeps keys Pazuzu does not know', merged.strange?.a === 1 && merged.gateway.extra === 'keep')
+check('merge overwrites the known fields', merged.gateway.queueMax === 7 && merged.db.path === 'p.db' && merged.auth.enabled === true)
+check('merge on broken text writes a clean config', JSON.parse(mergeConfigText('not json {{{', { db: { path: 'p.db' }, auth: { enabled: false, gitlab: CONFIG_DEFAULTS.auth.gitlab }, gateway: CONFIG_DEFAULTS.gateway })).auth.gitlab.enabled === false)
+
+const good = validateConfigInput({
+  db: { path: ' data/x.db ' },
+  auth: { enabled: true, gitlab: { ...CONFIG_DEFAULTS.auth.gitlab, enabled: true, baseUrl: 'http://gitlab.lan/', clientId: ' cid ', clientSecret: ' sec ', allowedGroups: ['ops', '  ', 42] } },
+  gateway: { ...CONFIG_DEFAULTS.gateway, queueMax: 7 }
+})
+check('validate: good form has no errors', good.errors.length === 0)
+check('validate: values normalized', good.config.db.path === 'data/x.db' && good.config.auth.gitlab.baseUrl === 'http://gitlab.lan' && good.config.auth.gitlab.clientId === 'cid')
+check('validate: allowedGroups filtered to strings', JSON.stringify(good.config.auth.gitlab.allowedGroups) === '["ops"]')
+
+const bad = validateConfigInput({
+  db: { path: '  ' },
+  auth: { enabled: 'yes', gitlab: { enabled: true, baseUrl: 42, clientId: '', clientSecret: '' } },
+  gateway: { queueMax: 99999, sessionIdleMin: 0 }
+})
+check('validate: empty db.path rejected', bad.errors.some(e => e.startsWith('db.path')))
+check('validate: wrong types rejected', bad.errors.some(e => e.startsWith('auth.enabled')) && bad.errors.some(e => e.startsWith('auth.gitlab.baseUrl')))
+check('validate: half-configured gitlab rejected', bad.errors.some(e => e.startsWith('auth.gitlab:')))
+check('validate: out-of-range numbers rejected', bad.errors.some(e => e.startsWith('gateway.queueMax')) && bad.errors.some(e => e.startsWith('gateway.sessionIdleMin')))
+
+await write(JSON.stringify({ futureSetting: { keep: true }, gateway: { queueMax: 5 } }))
+saveConfig(good.config)
+cfg = loadConfig()
+check('saveConfig takes effect without a restart', cfg.auth.enabled === true && cfg.db.path === 'data/x.db' && cfg.gateway.queueMax === 7)
+const savedRaw = JSON.parse(readFileSync(file, 'utf8'))
+check('saveConfig keeps hand-added keys', savedRaw.futureSetting?.keep === true)
+saveConfig(validateConfigInput({ db: { path: 'a.db' }, auth: { enabled: false, gitlab: CONFIG_DEFAULTS.auth.gitlab }, gateway: { ...CONFIG_DEFAULTS.gateway, queueMax: 9 } }).config)
+saveConfig(validateConfigInput({ db: { path: 'b.db' }, auth: { enabled: false, gitlab: CONFIG_DEFAULTS.auth.gitlab }, gateway: { ...CONFIG_DEFAULTS.gateway, queueMax: 11 } }).config)
+cfg = loadConfig()
+check('back-to-back saves reload the cache', cfg.db.path === 'b.db' && cfg.gateway.queueMax === 11)
 
 const errLog = console.error
 console.error = () => { /* expected parse error */ }

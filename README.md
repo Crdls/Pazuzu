@@ -124,8 +124,11 @@ System-level settings live in `config.json` next to the project root — copy
 The file is optional (absent = defaults: `data/data.db`, auth off).
 `auth.enabled` applies as soon as the file changes; `db.path` applies at
 startup — restart after changing it (relative paths resolve from the project
-root). Unlike the Settings page, these switches intentionally require
-filesystem access — auth cannot be turned off from the web UI.
+root). Admins can also edit all of this from the **System configuration**
+card on the Settings page: saving rewrites `config.json` in place (extra
+keys added by hand survive it) and the values apply immediately — only
+`db.path` needs a restart. With auth off the card is open to everyone on
+the network, like the rest of the app.
 
 With auth enabled:
 
@@ -141,8 +144,9 @@ With auth enabled:
 - servers remember who added them: editing, deleting and toggling a server
   is allowed to its creator and to admins only (with auth off everybody
   may do everything, as before);
-- the interval and retention settings on the Settings page are editable by
-  admins only (the password and appearance cards stay available to everyone);
+- the interval and retention settings and the **System configuration** card
+  (edits `config.json`) on the Settings page are editable by admins only
+  (the password and appearance cards stay available to everyone);
 - sign out in the sidebar; the Settings page can change your own password
   (the current session stays signed in, others are signed out).
 
