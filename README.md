@@ -34,8 +34,9 @@ that load-balances application calls across all your engines.
   values take effect immediately, only the database path waits for a
   restart.
 - **Self-update** — the sidebar shows the running commit, `origin` is checked
-  every 6 hours, and Settings → Updates pulls, rebuilds and restarts the
-  server in one click (admins while auth is on).
+  every 6 hours, and an "Update & restart" button in the sidebar footer (also
+  in Settings → Updates) pulls, rebuilds and restarts the server in one click
+  (admins while auth is on).
 - **Theme** — light / dark / system: quick toggle in the sidebar (a drawer
   on mobile) or a selector in Settings; the color scheme is Standard
   (built-in defaults: an intense bioluminescent cyan accent over
@@ -85,7 +86,8 @@ install or build step may get killed with exit code 135 — cap the Node heap:
 The running build is a git checkout, so Pazuzu knows its own commit and
 shows it in the sidebar; clicking that line checks for updates on the spot.
 Every 6 hours (or on "Check now") it asks `origin`
-whether the branch moved; Settings → Updates then offers "Update & restart"
+whether the branch moved; when it has, an "Update & restart" button appears in
+the sidebar footer (and in Settings → Updates) for those who may apply it
 (admins while auth is on). That runs `scripts/autoupdate.mjs` in the
 background: wait for the server to exit, `git pull --ff-only`,
 `npm install --omit=dev`, `npm run build`, then start the server again — the

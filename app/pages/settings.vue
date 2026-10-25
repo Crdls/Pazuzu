@@ -255,15 +255,10 @@ function selectScheme (mode: string) {
 }
 
 // version and self-update: anyone can check, applying is admin-only while auth is on
-const { status: upd, refresh: refreshUpdate, checkNow } = useUpdate()
-const canApply = computed(() =>
-  (!status.value?.authEnabled || isAdmin.value) &&
-  Boolean(upd.value?.currentSha) && Boolean(upd.value?.updateAvailable) &&
-  !upd.value?.dev && !upd.value?.applying
-)
+// (canApply / restarting / applyUpdate live in the shared useUpdate composable)
+const { status: upd, checkNow, canApply, restarting, applyUpdate } = useUpdate()
 const updateChecking = ref(false)
 const applyOpen = ref(false)
-const restarting = ref(false)
 // only surface a failed autoupdate run; a successful one is visible in the version itself
 const failedUpdate = computed(() => (upd.value?.lastUpdate && !upd.value.lastUpdate.ok ? upd.value.lastUpdate : null))
 
@@ -285,48 +280,6 @@ async function checkUpdate () {
   } finally {
     updateChecking.value = false
   }
-}
-
-async function runUpdate () {
-  const from = upd.value?.currentSha ?? ''
-  const startedAt = Date.now()
-  applyOpen.value = false
-  try {
-    await $fetch('/api/update/apply', { method: 'POST' })
-  } catch (err: unknown) {
-    toast.add({
-      title: t('update.toastApplyFailed'),
-      description: (err as { statusMessage?: string })?.statusMessage ?? String(err),
-      color: 'error'
-    })
-    return
-  }
-  // the server exits for the rebuild - poll until the new build answers
-  restarting.value = true
-  const deadline = Date.now() + 240_000
-  while (Date.now() < deadline) {
-    await new Promise(resolve => setTimeout(resolve, 2000))
-    try {
-      const st = await $fetch<{
-        currentSha: string | null
-        lastUpdate: { startedAt: number, ok: boolean, step: string | null } | null
-      }>('/api/update/status')
-      if (st.currentSha && st.currentSha !== from) {
-        toast.add({ title: t('update.backOnline', { version: shortVersion(st.currentSha) }), color: 'success' })
-        setTimeout(() => location.reload(), 1200)
-        return
-      }
-      // the same build came back: the updater finished but gave up on a step
-      if (st.lastUpdate && st.lastUpdate.startedAt >= startedAt - 60_000 && !st.lastUpdate.ok) {
-        restarting.value = false
-        toast.add({ title: t('update.lastFailed', { step: st.lastUpdate.step ?? '?' }), color: 'error' })
-        await refreshUpdate()
-        return
-      }
-    } catch { /* still restarting */ }
-  }
-  restarting.value = false
-  toast.add({ title: t('update.restartTimeout'), color: 'error' })
 }
 </script>
 
@@ -608,7 +561,7 @@ async function runUpdate () {
           <UButton color="neutral" variant="ghost" @click="applyOpen = false">
             {{ t('common.cancel') }}
           </UButton>
-          <UButton @click="runUpdate">
+          <UButton @click="applyOpen = false; applyUpdate()">
             {{ t('update.applyConfirm') }}
           </UButton>
         </div>

@@ -5,7 +5,7 @@ const emit = defineEmits<{ dismiss: [] }>()
 const route = useRoute()
 const { status, isAdmin, signOut } = useAuth()
 const { connected } = useLive()
-const { status: updateStatus, checkNow } = useUpdate()
+const { status: updateStatus, checkNow, canApply, restarting, applyUpdate } = useUpdate()
 const authUser = computed(() => (status.value?.authEnabled ? status.value.user : null))
 const { t } = useI18n()
 const toast = useToast()
@@ -15,6 +15,11 @@ const versionDate = computed(() => (updateStatus.value?.commitTs ? new Date(upda
 
 // the version line doubles as the quick check button
 const checkingUpdate = ref(false)
+
+// apply confirm dialog (the same flow as the Settings update card); the modal
+// must stay mounted, so on mobile we do not dismiss the slideover before opening
+// it - UModal teleports to the body and layers above the slideover
+const applyOpen = ref(false)
 
 async function checkUpdate () {
   if (checkingUpdate.value) return
@@ -103,6 +108,23 @@ function isActive (to: string) {
         </button>
       </UTooltip>
 
+      <!-- the arrow badge alone is easy to miss: offer the action right here,
+           only to those who may apply it (the API enforces this regardless) -->
+      <UButton
+        v-if="canApply && !restarting"
+        size="xs"
+        color="warning"
+        icon="i-lucide-download"
+        class="mx-2 mb-1"
+        @click="applyOpen = true"
+      >
+        {{ t('update.apply') }}
+      </UButton>
+      <p v-else-if="restarting" class="px-2 pb-1.5 flex items-center gap-1 text-[11px] text-muted">
+        <UIcon name="i-lucide-loader-circle" class="size-3 shrink-0 animate-spin" />
+        <span class="truncate">{{ t('update.restarting') }}</span>
+      </p>
+
       <div class="flex items-center justify-between gap-1 -mx-3 px-3 pt-2 border-t border-(--ui-bg)">
         <UTooltip :text="connected ? t('common.liveHint') : t('common.pollHint')">
           <UIcon
@@ -153,5 +175,20 @@ function isActive (to: string) {
         </UTooltip>
       </div>
     </div>
+
+    <!-- update confirm: the server pulls, rebuilds and restarts itself -->
+    <UModal v-model:open="applyOpen" :title="t('update.applyTitle')">
+      <template #body>
+        <p class="text-sm">{{ t('update.applyText') }}</p>
+        <div class="flex justify-end gap-2 pt-4">
+          <UButton color="neutral" variant="ghost" @click="applyOpen = false">
+            {{ t('common.cancel') }}
+          </UButton>
+          <UButton @click="applyOpen = false; applyUpdate()">
+            {{ t('update.applyConfirm') }}
+          </UButton>
+        </div>
+      </template>
+    </UModal>
   </div>
 </template>

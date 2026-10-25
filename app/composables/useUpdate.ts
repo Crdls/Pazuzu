@@ -42,5 +42,60 @@ export function useUpdate () {
     await refresh()
   }
 
-  return { status: data, pending, refresh, checkNow }
+  const { status: authStatus, isAdmin } = useAuth()
+  const { t } = useI18n()
+  const toast = useToast()
+
+  // anyone can check for updates, applying is admin-only while auth is on
+  const canApply = computed(() =>
+    (!authStatus.value?.authEnabled || isAdmin.value) &&
+    Boolean(data.value?.currentSha) && Boolean(data.value?.updateAvailable) &&
+    !data.value?.dev && !data.value?.applying
+  )
+
+  // shared across every useUpdate() call site (two sidebar copies + settings)
+  const restarting = useState('update-restarting', () => false)
+
+  async function applyUpdate (): Promise<void> {
+    const from = data.value?.currentSha ?? ''
+    const startedAt = Date.now()
+    try {
+      await $fetch('/api/update/apply', { method: 'POST' })
+    } catch (err: unknown) {
+      toast.add({
+        title: t('update.toastApplyFailed'),
+        description: (err as { statusMessage?: string })?.statusMessage ?? String(err),
+        color: 'error'
+      })
+      return
+    }
+    // the server exits for the rebuild - poll until the new build answers
+    restarting.value = true
+    const deadline = Date.now() + 240_000
+    while (Date.now() < deadline) {
+      await new Promise(resolve => setTimeout(resolve, 2000))
+      try {
+        const st = await $fetch<{
+          currentSha: string | null
+          lastUpdate: { startedAt: number, ok: boolean, step: string | null } | null
+        }>('/api/update/status')
+        if (st.currentSha && st.currentSha !== from) {
+          toast.add({ title: t('update.backOnline', { version: shortVersion(st.currentSha) }), color: 'success' })
+          setTimeout(() => location.reload(), 1200)
+          return
+        }
+        // the same build came back: the updater finished but gave up on a step
+        if (st.lastUpdate && st.lastUpdate.startedAt >= startedAt - 60_000 && !st.lastUpdate.ok) {
+          restarting.value = false
+          toast.add({ title: t('update.lastFailed', { step: st.lastUpdate.step ?? '?' }), color: 'error' })
+          await refresh()
+          return
+        }
+      } catch { /* still restarting */ }
+    }
+    restarting.value = false
+    toast.add({ title: t('update.restartTimeout'), color: 'error' })
+  }
+
+  return { status: data, pending, refresh, checkNow, canApply, restarting, applyUpdate }
 }
