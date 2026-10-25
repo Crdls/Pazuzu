@@ -8,6 +8,9 @@ export type ClientPriority = 'high' | 'normal' | 'low'
 export const PRIORITIES: ClientPriority[] = ['high', 'normal', 'low']
 export const DEFAULT_PRIORITY: ClientPriority = 'normal'
 
+/** Routing preference tiers (client → server): lower rank is tried first. */
+export const TIER_RANK: Record<ClientPriority, number> = { high: 0, normal: 1, low: 2 }
+
 export type GatewayMode = 'on' | 'drain' | 'off'
 export const GATEWAY_MODES: GatewayMode[] = ['on', 'drain', 'off']
 

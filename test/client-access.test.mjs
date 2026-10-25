@@ -5,10 +5,10 @@ import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import {
-  allowedServerIds, createGatewayClient, deleteGatewayClient, listClientServerIds,
-  setClientServerAccess, setServerClientAccess, useDb
+  allowedServerIds, clientServerPriorities, createGatewayClient, deleteGatewayClient, listClientServerIds,
+  setClientServerAccess, setClientServerPriorities, setServerClientAccess, useDb
 } from '../server/utils/db.ts'
-import { parseExistingIds } from '../server/utils/gateway/access.ts'
+import { parseExistingIds, parseServerPriorities } from '../server/utils/gateway/access.ts'
 
 let failed = 0
 function check (name, cond) {
@@ -60,12 +60,59 @@ check('re-saving the same selection changes nothing', (() => {
   return JSON.stringify([allowedServerIds(a.id), allowedServerIds(b.id)]) === before
 })())
 
+// ---------- preference tiers ----------
+const tiered = addClient('tiered')
+check('fresh client has no tiers', clientServerPriorities(tiered.id).size === 0)
+// tiers work regardless of access mode; set on an unrestricted client
+setClientServerPriorities(tiered.id, new Map([[s1, 'high'], [s2, 'low']]))
+const t1 = clientServerPriorities(tiered.id)
+check('tiers round-trip', t1.get(s1) === 'high' && t1.get(s2) === 'low')
+check('normal tier is stored as absent', (() => {
+  setClientServerPriorities(tiered.id, new Map([[s1, 'high'], [s2, 'normal']]))
+  const m = clientServerPriorities(tiered.id)
+  return m.get(s1) === 'high' && !m.has(s2)
+})())
+check('replace drops the previous tiers', (() => {
+  setClientServerPriorities(tiered.id, new Map([[s3, 'high']]))
+  const m = clientServerPriorities(tiered.id)
+  return m.size === 1 && m.get(s3) === 'high'
+})())
+check('empty tier map clears everything', (() => {
+  setClientServerPriorities(tiered.id, new Map())
+  return clientServerPriorities(tiered.id).size === 0
+})())
+// independent of access: a restricted client keeps its allowed set after tier edits
+const aAllowedBefore = JSON.stringify([...allowedServerIds(a.id)].sort())
+setClientServerPriorities(a.id, new Map([[s3, 'high']]))
+check('tiers do not touch the allowed set', JSON.stringify([...allowedServerIds(a.id)].sort()) === aAllowedBefore && clientServerPriorities(a.id).get(s3) === 'high')
+check('an unrestricted client can still hold tiers', (() => {
+  setClientServerAccess(b.id, true, [])
+  setClientServerPriorities(b.id, new Map([[s1, 'high']]))
+  return allowedServerIds(b.id) === null && clientServerPriorities(b.id).get(s1) === 'high'
+})())
+// release the tiered client so the id assumptions below still hold
+deleteGatewayClient(tiered.id)
+check('client delete drops tiers too', (db.prepare('SELECT COUNT(*) AS n FROM gateway_client_priorities WHERE client_id = ?').get(tiered.id)).n === 0)
+
+// ---------- tier validation ----------
+check('parseServerPriorities rejects non-objects', parseServerPriorities('x') === null && parseServerPriorities([1]) === null)
+check('parseServerPriorities rejects bad tiers', parseServerPriorities({ [s1]: 'urgent' }) === null)
+check('parseServerPriorities rejects unknown servers', parseServerPriorities({ 999_999: 'high' }) === null)
+check('parseServerPriorities rejects non-id keys', parseServerPriorities({ cat: 'high' }) === null)
+check('parseServerPriorities drops normal as absent', (() => {
+  const m = parseServerPriorities({ [s1]: 'high', [s2]: 'normal' })
+  return m !== null && m.size === 1 && m.get(s1) === 'high'
+})())
+check('parseServerPriorities accepts the empty object', parseServerPriorities({}) !== null && parseServerPriorities({}).size === 0)
+
 // deleting a client or a server drops the pairs (the server cascade lives in
 // the DELETE route, here the client-side one from deleteGatewayClient)
 const doomed = addClient('doomed')
 setClientServerAccess(doomed.id, false, [s1])
+setClientServerPriorities(doomed.id, new Map([[s1, 'high']]))
 deleteGatewayClient(doomed.id)
 check('client delete drops the pairs', (db.prepare('SELECT COUNT(*) AS n FROM gateway_client_servers WHERE client_id = ?').get(doomed.id)).n === 0)
+check('client delete drops the tiers', (db.prepare('SELECT COUNT(*) AS n FROM gateway_client_priorities WHERE client_id = ?').get(doomed.id)).n === 0)
 
 // ---------- access list validation ----------
 check('parseExistingIds rejects non-arrays', parseExistingIds('x', 'servers') === null)

@@ -70,6 +70,33 @@ check('unavailable home falls back to least loaded', fallback.serverId === 3 && 
 check('hasCapacity sees free engines', hasCapacity([mk(1, { inflight: 4 }), mk(2)], now))
 check('hasCapacity false when all full', !hasCapacity([mk(1, { inflight: 4 }), mk(2, { inflight: 4 })], now))
 
+// ---------- preference tiers (client → server) ----------
+// 1 has more load than 2, but the client marked it as home (high)
+const homeHigh = new Map([[1, 'high']])
+check('home engine wins even when busier', pickServer([mk(1, { inflight: 3 }), mk(2)], null, now, homeHigh).serverId === 1)
+check('home chosen over emptier normal engine', pickServer([mk(1, { inflight: 1 }), mk(2, { inflight: 0 })], null, now, homeHigh).serverId === 1)
+// when the home engine cannot take work, degrade to the rest least-loaded
+check('full home falls back to least loaded', pickServer([mk(1, { inflight: 4, capacity: 4 }), mk(2, { inflight: 2 }), mk(3)], null, now, homeHigh).serverId === 3)
+check('drained home falls back to least loaded', pickServer([mk(1, { mode: 'drain' }), mk(2, { inflight: 2 }), mk(3)], null, now, homeHigh).serverId === 3)
+check('ejected home falls back to least loaded', pickServer([mk(1, { ejectedUntil: now + 1000 }), mk(2), mk(3, { inflight: 1 })], null, now, homeHigh).serverId === 2)
+// two homes balance least-loaded among themselves before touching normals
+const twoHomes = new Map([[1, 'high'], [2, 'high']])
+check('homes balance among themselves first', pickServer([mk(1, { inflight: 1 }), mk(2, { inflight: 2 }), mk(3)], null, now, twoHomes).serverId === 1)
+check('least-loaded home wins when one is fuller', pickServer([mk(1, { inflight: 3 }), mk(2, { inflight: 1 }), mk(3)], null, now, twoHomes).serverId === 2)
+// low is only reached when nothing else admits work
+const oneLow = new Map([[3, 'low']])
+check('low avoided while others admit', pickServer([mk(1), mk(2), mk(3)], null, now, oneLow).serverId === 1)
+check('low used when it is the only option', pickServer([mk(1, { inflight: 4, capacity: 4 }), mk(3)], null, now, oneLow).serverId === 3)
+// high beats low when both present; normal (absent) beats low too
+check('high wins over low', pickServer([mk(1), mk(3)], null, now, new Map([[1, 'high'], [3, 'low']])).serverId === 1)
+check('untouched normal beats explicit low', pickServer([mk(2), mk(3)], null, now, new Map([[3, 'low']])).serverId === 2)
+// affinity still outranks preference; a full home falls to the next tier
+const withTiers = new Map([[1, 'high'], [3, 'high']])
+const aff = pickServer([mk(1, { inflight: 2 }), mk(2), mk(3, { inflight: 1 })], 2, now, withTiers)
+check('chat affinity still outranks tiers', aff.serverId === 2 && aff.affinity)
+const noMap = pickServer([mk(1, { inflight: 3 }), mk(2)], null, now)
+check('missing tier map keeps least-loaded', noMap.serverId === 2)
+
 // ---------- aging ----------
 const aging = { lowToNormalMs: 30_000, normalToHighMs: 300_000 }
 check('high is always rank 0', effectiveRank('high', 0, aging) === 0)

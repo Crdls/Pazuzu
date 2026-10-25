@@ -48,7 +48,7 @@
 - **API 网关（可选）** — 一个 OpenAI 兼容端点（`/v1`）在所有引擎间负载均衡：
   按应用分配的 API 令牌（`msk_…`）、带 aging 的优先级队列、会话感知路由
   （同一会话始终落在持有其 KV 前缀缓存的引擎上）、按服务器的网关模式
-  （路由 / 排空 / 仅统计）以及来源 IP 记录；「客户端」页面同时也是网关控制台——
+  （路由 / 排空 / 仅统计）、按客户端的引擎偏好（本机硬件优先）以及来源 IP 记录；「客户端」页面同时也是网关控制台——
   实时队列与各引擎负载一览。默认关闭，在 `config.json` 或设置中开启
   `gateway.enabled` — 见下文「网关（负载均衡器）」。
 
@@ -219,15 +219,23 @@ Authorization: Bearer msk_…
 
 - **客户端** — 「客户端」页面（开启验证后仅管理员）管理允许调用网关的
   API 令牌：自动生成 `msk_…` 密钥（只显示一次，仅存储其哈希）或使用自定义
-  令牌；令牌可停用、轮换，带有优先级，每个客户端都有请求计数和来源 IP 记录。
+  令牌；令牌可停用、轮换，带有优先级，每个客户端都有请求计数、来源 IP 记录
+  和对引擎的偏好设置。
 - **客户端的服务器访问权限** — 可以限制每个客户端可用的引擎集合：在「客户端」
   页面勾选该客户可访问的服务器，在「服务器」页面勾选可使用该服务器的客户
   （两处都有「全选 / 取消全选」按钮）。新客户默认可以访问所有服务器，
   之后新增的服务器也自动可用，除非取消勾选。
+- **客户端的引擎偏好** — 在同一个「客户端」对话框里，每个可访问的服务器都可
+  标记为「本机」「普通」（默认）或「备用」。路由会优先使用客户端的「本机」
+  引擎（在它们之间按负载均衡），之后再落到「普通」；「备用」引擎只在别处都
+  无法接收时才使用。偏好与访问权限相互独立（对「所有服务器」的客户端同样
+  生效），因此拥有特定机器的客户端在条件允许时会一直用自己本地的硬件。
+  会话亲和仍优先于偏好，已开始的对话会留在原引擎上。
 - **会话亲和** — 一个会话会继续由持有其 KV 前缀缓存的引擎服务，对话不降温、
   缓存不浪费；空闲超过一小时的会话可能落到其他引擎。
-- **最小负载路由** — 新会话落到负载最小的引擎，每个引擎有可在服务器页面设置
-  的并发上限。当引擎内部队列堆积、KV 缓存接近占满，或刚有实时请求在其上失败
+- **最小负载路由** — 在客户端可访问的引擎中，新会话落到其最优先层级里负载
+  最小的引擎，每个引擎有可在服务器页面设置的并发上限。当引擎内部队列堆积、
+  KV 缓存接近占满，或刚有实时请求在其上失败
   时，该服务器会暂时不接新请求——网关让引擎的内部队列保持为空，优先级才
   有意义。
 - **优先级队列** — 所有引擎满载时请求进入高 / 普通 / 低通道，同通道内按
@@ -312,7 +320,7 @@ update.sh|.bat  一键安装/更新：pull + install --omit=dev + build
 - `GET /api/auth/gitlab/start` — 重定向到 GitLab；`GET /api/auth/gitlab/callback` — OAuth callback：请把这一 URL 原样注册为 GitLab 应用的 redirect URI
 - `GET /api/users`、`PATCH|DELETE /api/users/:id` — 用户管理（仅管理员；PATCH 接受 `role`、`disabled`、`password`；超级管理员账户与 `superadmin` 角色仅超级管理员可管理）
 - `GET /api/gateway/status` — 队列通道与各服务器的网关负载（开启验证后仅管理员）
-- `GET|POST /api/gateway/clients`、`PATCH|DELETE /api/gateway/clients/:id`、`POST /api/gateway/clients/:id/rotate`、`GET /api/gateway/clients/:id/ips` — 网关 API 令牌（开启验证后仅管理员；POST/rotate 只返回一次原始令牌；视图和 POST/PATCH 带有 `serversAll`/`serverIds` 字段）
+- `GET|POST /api/gateway/clients`、`PATCH|DELETE /api/gateway/clients/:id`、`POST /api/gateway/clients/:id/rotate`、`GET /api/gateway/clients/:id/ips` — 网关 API 令牌（开启验证后仅管理员；POST/rotate 只返回一次原始令牌；视图和 POST/PATCH 带有 `serversAll`/`serverIds` 以及 `serverPriorities`——形如 `{serverId: "high"|"normal"|"low"}` 的引擎偏好映射）
 - `PUT /api/gateway/servers/:id/clients` — 设置哪些客户可以使用该服务器（开启验证后仅管理员）
 - `/v1/**` — OpenAI 兼容网关，用客户端自己的令牌认证（`Authorization: Bearer msk_…`），不用会话 cookie — 见上文「网关（负载均衡器）」
 - `WS /_ws` — 推送快照

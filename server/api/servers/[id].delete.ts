@@ -18,6 +18,7 @@ export default defineEventHandler((event) => {
     db.prepare('DELETE FROM rollup_daily WHERE server_id = ?').run(serverId)
     db.prepare('DELETE FROM server_status WHERE server_id = ?').run(serverId)
     db.prepare('DELETE FROM gateway_client_servers WHERE server_id = ?').run(serverId)
+    db.prepare('DELETE FROM gateway_client_priorities WHERE server_id = ?').run(serverId)
   })
   tx(id)
   forgetServerState(id)

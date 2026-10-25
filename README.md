@@ -62,7 +62,8 @@ that load-balances application calls across all your engines.
   load-balances across all your engines: per-app API tokens (`msk_…`),
   a priority queue with aging, session-aware routing (a chat keeps hitting
   the engine that holds its KV prefix cache), per-server routing modes
-  (route / drain / stats-only) and source-IP tracking; the Clients page
+  (route / drain / stats-only), per-client engine preference (own machines
+  first) and source-IP tracking; the Clients page
   doubles as a gateway console with live queues and per-engine load. Off by
   default, enable with `gateway.enabled` in `config.json` or on the Settings
   page — see [Gateway](#gateway-load-balancer).
@@ -268,12 +269,21 @@ or on the Settings page, in the **System configuration** card.
   Servers page picks which clients a server is available to (both with
   select-all / select-none buttons). A new client reaches every server,
   including ones added later, until some are unchecked.
+- **Per-client engine preference** — in the same Clients dialog each reachable
+  server can be tagged **Home**, **Normal** or **Fallback** (default Normal).
+  Routing takes a client's Home engines first, balances among them by load,
+  and only then spills to Normal engines; Fallback engines are used only when
+  nothing else can admit the request. The tiers are independent of access
+  (they apply to all-server clients too), so a client that owns particular
+  machines keeps using its own hardware while it can. Session affinity still
+  wins over preference, so an existing chat stays on its engine.
 - **Session affinity** — a chat keeps hitting the engine that holds its KV
   prefix cache, so conversations answer fast and caches stay warm; a chat
   idle for over an hour may land on another engine.
-- **Least-loaded routing** — a new conversation goes to the least loaded
-  engine, each capped by a per-server concurrency limit settable on the
-  Servers page. A server temporarily takes no new work while its engine
+- **Least-loaded routing** — among the engines a client is allowed to use,
+  a new conversation goes to the least loaded one within its most preferred
+  tier, each capped by a per-server concurrency limit settable
+  on the Servers page. A server temporarily takes no new work while its engine
   reports a waiting queue, a nearly full KV cache, or a just-failed live
   request — the engine's own queue stays empty, so the priorities below
   keep meaning something.
@@ -369,7 +379,7 @@ update.sh|.bat  one-shot install/update: pull + install --omit=dev + build
 - `GET /api/auth/gitlab/start` — redirect to GitLab; `GET /api/auth/gitlab/callback` — the OAuth callback endpoint: register exactly this URL as the redirect URI in the GitLab application
 - `GET /api/users`, `PATCH|DELETE /api/users/:id` — user management (admins only; PATCH takes `role`, `disabled`, `password`; superadmin accounts and the `superadmin` role are managed by superadmins only)
 - `GET /api/gateway/status` — queue lanes and per-server gateway load (admin only when auth is on)
-- `GET|POST /api/gateway/clients`, `PATCH|DELETE /api/gateway/clients/:id`, `POST /api/gateway/clients/:id/rotate`, `GET /api/gateway/clients/:id/ips` — gateway API tokens (admins only when auth is on; POST/rotate return the raw token once; the view and POST/PATCH carry `serversAll`/`serverIds`)
+- `GET|POST /api/gateway/clients`, `PATCH|DELETE /api/gateway/clients/:id`, `POST /api/gateway/clients/:id/rotate`, `GET /api/gateway/clients/:id/ips` — gateway API tokens (admins only when auth is on; POST/rotate return the raw token once; the view and POST/PATCH carry `serversAll`/`serverIds` and `serverPriorities` — a `{serverId: "high"|"normal"|"low"}` map of engine preference)
 - `PUT /api/gateway/servers/:id/clients` — set which clients may route through that server (admin only when auth is on)
 - `/v1/**` — OpenAI-compatible gateway, authenticated by client tokens (`Authorization: Bearer msk_…`), not by the session cookie — see [Gateway](#gateway-load-balancer)
 - `WS /_ws` — push snapshots

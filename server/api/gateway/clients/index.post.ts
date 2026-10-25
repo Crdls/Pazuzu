@@ -1,16 +1,16 @@
 import { requireAdmin } from '../../../utils/auth'
 import { loadConfig } from '../../../utils/config'
-import { createGatewayClient, getGatewayClientById, getGatewayClientByTokenHash, setClientServerAccess } from '../../../utils/db'
+import { createGatewayClient, getGatewayClientById, getGatewayClientByTokenHash, setClientServerAccess, setClientServerPriorities } from '../../../utils/db'
 import { hashToken } from '../../../utils/credentials'
-import { parseExistingIds } from '../../../utils/gateway/access'
+import { parseExistingIds, parseServerPriorities } from '../../../utils/gateway/access'
 import { PRIORITIES, type ClientPriority } from '../../../utils/gateway/types'
 import { generateClientToken, normalizeCustomToken, tokenHint } from '../../../utils/gateway/tokens'
-import { clientViewPlain } from '../../../utils/gateway/view'
+import { clientViewPlain, prioritiesRecord } from '../../../utils/gateway/view'
 
 // create a client; the raw token is returned exactly once, here
 export default defineEventHandler(async (event) => {
   if (loadConfig().auth.enabled) requireAdmin(event)
-  const body = await readBody<{ name?: string, priority?: string, debug?: boolean, token?: string, serversAll?: boolean, serverIds?: unknown }>(event)
+  const body = await readBody<{ name?: string, priority?: string, debug?: boolean, token?: string, serversAll?: boolean, serverIds?: unknown, serverPriorities?: unknown }>(event)
   const name = body?.name?.trim()
   if (!name || name.length > 64) {
     throw createError({ statusCode: 400, statusMessage: 'name is required (max 64 chars)' })
@@ -39,6 +39,14 @@ export default defineEventHandler(async (event) => {
   if (getGatewayClientByTokenHash(tokenHash)) {
     throw createError({ statusCode: 409, statusMessage: 'this token is already in use' })
   }
+  // preference tiers are independent of access — settable in either mode
+  let tiers: Map<number, ClientPriority> | null = null
+  if (body?.serverPriorities !== undefined) {
+    tiers = parseServerPriorities(body.serverPriorities)
+    if (!tiers) {
+      throw createError({ statusCode: 400, statusMessage: 'serverPriorities must map existing server ids to high, normal or low' })
+    }
+  }
   const client = createGatewayClient({
     name,
     tokenHash,
@@ -48,5 +56,6 @@ export default defineEventHandler(async (event) => {
     createdBy: event.context.userId ?? null
   })
   if (restricted) setClientServerAccess(client.id, false, restricted)
-  return { ...clientViewPlain(getGatewayClientById(client.id)!, restricted ?? []), token }
+  if (tiers) setClientServerPriorities(client.id, tiers)
+  return { ...clientViewPlain(getGatewayClientById(client.id)!, restricted ?? [], prioritiesRecord(tiers ?? new Map())), token }
 })

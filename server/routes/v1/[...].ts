@@ -1,5 +1,5 @@
 import { loadConfig } from '../../utils/config'
-import { allowedServerIds, getGatewayClientByTokenHash, useDb, type ServerRow } from '../../utils/db'
+import { allowedServerIds, clientServerPriorities, getGatewayClientByTokenHash, useDb, type ServerRow } from '../../utils/db'
 import { hashToken } from '../../utils/credentials'
 import { bearerFrom } from '../../utils/gateway/tokens'
 import { deriveSessionKey, SESSION_HEADER } from '../../utils/gateway/session'
@@ -68,6 +68,9 @@ export default defineEventHandler(async (event) => {
   recordIpHit(client.id, clientIp)
   // per-client server access: null = every server, else the explicitly granted ids
   const allowed = allowedServerIds(client.id)
+  // per-client preference tiers: home engines are routed to first (works for
+  // unrestricted clients too)
+  const tiers = clientServerPriorities(client.id)
 
   // ---------- buffered body (session key + replayable forwarding) ----------
   const declaredLen = Number(getHeader(event, 'content-length') ?? '') || 0
@@ -95,7 +98,7 @@ export default defineEventHandler(async (event) => {
   event.node.res.once('finish', () => { responseFinished = true })
   event.node.res.once('close', () => { if (!responseFinished) ac.abort() })
 
-  // ---------- routing: affinity → least loaded → priority waiting room ----------
+  // ---------- routing: affinity → preference tier → least loaded → waiting room ----------
   const keyHash = deriveSessionKey(getHeader(event, SESSION_HEADER), parsed)
   const url = getRequestURL(event)
   const now = Date.now()
@@ -104,7 +107,7 @@ export default defineEventHandler(async (event) => {
     return jsonError(503, 'No engine is online for routing (gateway)', 'no_upstream')
   }
   const preferred = keyHash ? getAffinity(keyHash, now) : null
-  const decision = acquireNow(loads, preferred, now)
+  const decision = acquireNow(loads, preferred, now, tiers)
   let serverId = decision.serverId
   let waitedMs = 0
 
@@ -167,7 +170,7 @@ export default defineEventHandler(async (event) => {
       }
       eject(server.id)
       releaseNow()
-      const alt = pickServer(filterLoads(serverLoads(Date.now()), allowed).filter(s => s.id !== server.id), null, Date.now()).serverId
+      const alt = pickServer(filterLoads(serverLoads(Date.now()), allowed).filter(s => s.id !== server.id), null, Date.now(), tiers).serverId
       if (attempt === 0 && alt != null) {
         failed.add(server.id)
         serverId = alt
@@ -181,7 +184,7 @@ export default defineEventHandler(async (event) => {
       void res.body?.cancel().catch(() => {})
       eject(server.id)
       releaseNow()
-      const alt = pickServer(filterLoads(serverLoads(Date.now()), allowed).filter(s => s.id !== server.id), null, Date.now()).serverId
+      const alt = pickServer(filterLoads(serverLoads(Date.now()), allowed).filter(s => s.id !== server.id), null, Date.now(), tiers).serverId
       if (alt != null) {
         failed.add(server.id)
         serverId = alt

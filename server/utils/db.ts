@@ -189,6 +189,13 @@ CREATE TABLE IF NOT EXISTS gateway_client_servers (
   PRIMARY KEY (client_id, server_id)
 );
 CREATE INDEX IF NOT EXISTS idx_gcs_server ON gateway_client_servers (server_id);
+CREATE TABLE IF NOT EXISTS gateway_client_priorities (
+  client_id INTEGER NOT NULL,
+  server_id INTEGER NOT NULL,
+  priority  TEXT NOT NULL,
+  PRIMARY KEY (client_id, server_id)
+);
+CREATE INDEX IF NOT EXISTS idx_gcp_server ON gateway_client_priorities (server_id);
 `
 
 let db: Database.Database | null = null
@@ -437,6 +444,7 @@ export function deleteGatewayClient (id: number): void {
     db.prepare('DELETE FROM gateway_client_ips WHERE client_id = ?').run(id)
     db.prepare('DELETE FROM gateway_usage WHERE client_id = ?').run(id)
     db.prepare('DELETE FROM gateway_client_servers WHERE client_id = ?').run(id)
+    db.prepare('DELETE FROM gateway_client_priorities WHERE client_id = ?').run(id)
     db.prepare('DELETE FROM gateway_clients WHERE id = ?').run(id)
   })()
 }
@@ -475,6 +483,28 @@ export function setClientServerAccess (clientId: number, serversAll: boolean, se
     if (serversAll) return
     const ins = db.prepare('INSERT OR IGNORE INTO gateway_client_servers (client_id, server_id) VALUES (?, ?)')
     for (const serverId of new Set(serverIds)) ins.run(clientId, serverId)
+  })()
+}
+
+/**
+ * Preference tiers of a client: serverId -> high/low. Only non-'normal'
+ * levels are stored; absent means normal. Independent of access, so tiers
+ * also apply to servers_all clients.
+ */
+export function clientServerPriorities (clientId: number): Map<number, ClientPriority> {
+  const rows = useDb()
+    .prepare('SELECT server_id, priority FROM gateway_client_priorities WHERE client_id = ?')
+    .all(clientId) as Array<{ server_id: number, priority: ClientPriority }>
+  return new Map(rows.map(r => [r.server_id, r.priority]))
+}
+
+/** Replace a client's preference tiers; 'normal' entries are stored as absent. */
+export function setClientServerPriorities (clientId: number, priorities: Map<number, ClientPriority>): void {
+  const db = useDb()
+  db.transaction(() => {
+    db.prepare('DELETE FROM gateway_client_priorities WHERE client_id = ?').run(clientId)
+    const ins = db.prepare('INSERT INTO gateway_client_priorities (client_id, server_id, priority) VALUES (?, ?, ?)')
+    for (const [serverId, priority] of priorities) if (priority !== 'normal') ins.run(clientId, serverId, priority)
   })()
 }
 

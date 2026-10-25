@@ -1,15 +1,15 @@
 import { requireAdmin } from '../../../utils/auth'
 import { loadConfig } from '../../../utils/config'
-import { getGatewayClientById, listClientServerIds, setClientServerAccess, updateGatewayClient } from '../../../utils/db'
-import { parseExistingIds } from '../../../utils/gateway/access'
+import { clientServerPriorities, getGatewayClientById, listClientServerIds, setClientServerAccess, setClientServerPriorities, updateGatewayClient } from '../../../utils/db'
+import { parseExistingIds, parseServerPriorities } from '../../../utils/gateway/access'
 import { PRIORITIES, type ClientPriority } from '../../../utils/gateway/types'
-import { clientViewPlain } from '../../../utils/gateway/view'
+import { clientViewPlain, prioritiesRecord } from '../../../utils/gateway/view'
 
 export default defineEventHandler(async (event) => {
   if (loadConfig().auth.enabled) requireAdmin(event)
   const id = Number(getRouterParam(event, 'id'))
   if (!getGatewayClientById(id)) throw createError({ statusCode: 404, statusMessage: 'client not found' })
-  const body = await readBody<{ name?: string, priority?: string, debug?: boolean, enabled?: boolean, serversAll?: boolean, serverIds?: unknown }>(event)
+  const body = await readBody<{ name?: string, priority?: string, debug?: boolean, enabled?: boolean, serversAll?: boolean, serverIds?: unknown, serverPriorities?: unknown }>(event)
   const patch: { name?: string, priority?: ClientPriority, debug?: boolean, enabled?: boolean } = {}
   if (body?.name !== undefined) {
     const name = body.name.trim()
@@ -32,5 +32,10 @@ export default defineEventHandler(async (event) => {
     if (!ids) throw createError({ statusCode: 400, statusMessage: 'serverIds must be a list of existing server ids' })
     setClientServerAccess(id, false, ids)
   }
-  return clientViewPlain(getGatewayClientById(id)!, listClientServerIds(id))
+  if (body?.serverPriorities !== undefined) {
+    const tiers = parseServerPriorities(body.serverPriorities)
+    if (!tiers) throw createError({ statusCode: 400, statusMessage: 'serverPriorities must map existing server ids to high, normal or low' })
+    setClientServerPriorities(id, tiers)
+  }
+  return clientViewPlain(getGatewayClientById(id)!, listClientServerIds(id), prioritiesRecord(clientServerPriorities(id)))
 })

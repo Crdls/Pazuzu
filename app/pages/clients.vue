@@ -44,6 +44,28 @@ function toggleIn (list: { value: number[] }, id: number, on: boolean): void {
   list.value = on ? [...new Set([...list.value, id])] : list.value.filter(x => x !== id)
 }
 
+// ---------- per-server preference tiers (add + edit modals) ----------
+const serverPrioItems = computed(() => [
+  { value: 'high', label: t('clients.srvPrioHome') },
+  { value: 'normal', label: t('clients.srvPrioNormal') },
+  { value: 'low', label: t('clients.srvPrioFallback') }
+])
+function prioOf (prios: Record<number, string>, id: number): string {
+  return prios[id] ?? 'normal'
+}
+function setPrio (prios: Record<number, string>, id: number, tier: unknown): void {
+  prios[id] = String(tier)
+}
+/** Checked servers -> tiers; 'normal' is left out, the server stores it as absent. */
+function prioPayload (prios: Record<number, string>, ids: number[]): Record<string, string> {
+  const out: Record<string, string> = {}
+  for (const id of ids) {
+    const tier = prios[id] ?? 'normal'
+    if (tier !== 'normal') out[String(id)] = tier
+  }
+  return out
+}
+
 function fmtTime (ts: number | null): string {
   return ts ? new Date(ts).toLocaleString() : '—'
 }
@@ -88,6 +110,7 @@ async function copyToken () {
 const addOpen = ref(false)
 const addForm = reactive({ name: '', priority: 'normal', debug: false, token: '' })
 const addServers = ref<number[]>([])
+const addPrios = ref<Record<number, string>>({})
 const saving = ref(false)
 const priorityItems = computed(() => [
   { value: 'high', label: t('clients.prioHigh') },
@@ -101,6 +124,7 @@ function openAdd () {
   addForm.debug = false
   addForm.token = ''
   addServers.value = allServerIds()
+  addPrios.value = {}
   addOpen.value = true
 }
 
@@ -125,6 +149,7 @@ async function createClient () {
         debug: addForm.debug,
         serversAll: addServers.value.length === allServerIds().length,
         serverIds: addServers.value,
+        serverPriorities: prioPayload(addPrios.value, addServers.value),
         ...(addForm.token.trim() ? { token: addForm.token.trim() } : {})
       }
     })
@@ -147,6 +172,7 @@ const editOpen = ref(false)
 const editing = ref<GatewayClientView | null>(null)
 const editForm = reactive({ name: '', priority: 'normal', debug: false, enabled: true })
 const editServers = ref<number[]>([])
+const editPrios = ref<Record<number, string>>({})
 
 function openEdit (client: GatewayClientView) {
   editing.value = client
@@ -156,6 +182,9 @@ function openEdit (client: GatewayClientView) {
   editForm.enabled = client.enabled
   const known = allServerIds()
   editServers.value = client.serversAll ? known : client.serverIds.filter(id => known.includes(id))
+  editPrios.value = Object.fromEntries(
+    Object.entries(client.serverPriorities ?? {}).filter(([id]) => known.includes(Number(id)))
+  )
   editOpen.value = true
 }
 
@@ -168,7 +197,8 @@ async function saveEdit () {
       body: {
         ...editForm,
         serversAll: editServers.value.length === allServerIds().length,
-        serverIds: editServers.value
+        serverIds: editServers.value,
+        serverPriorities: prioPayload(editPrios.value, editServers.value)
       }
     })
     editOpen.value = false
@@ -342,6 +372,9 @@ function priorityColor (p: string): 'error' | 'primary' | 'neutral' {
               <div class="text-xs text-dimmed font-mono">{{ client.tokenHint }}</div>
               <div class="text-xs text-dimmed">
                 {{ client.serversAll ? t('clients.serversAll') : t('clients.serversCount', { n: client.serverIds.length, total: (serverOptions ?? []).length }) }}
+                <span v-if="Object.keys(client.serverPriorities ?? {}).length" class="ml-1 text-warning" :title="t('clients.srvPrioHelp')">
+                  ★ {{ t('clients.srvPrioMark', { n: Object.keys(client.serverPriorities).length }) }}
+                </span>
               </div>
             </td>
             <td class="py-2.5 pr-3">
@@ -421,11 +454,23 @@ function priorityColor (p: string): 'error' | 'primary' | 'neutral' {
               </UButton>
             </div>
             <div v-if="!serverOptions?.length" class="text-sm text-muted">{{ t('clients.serversEmpty') }}</div>
-            <div v-else class="max-h-40 overflow-y-auto rounded-md border border-default divide-y divide-default">
-              <label v-for="s in serverOptions" :key="s.id" class="flex items-center gap-2 px-2.5 py-1.5 text-sm cursor-pointer hover:bg-elevated/50">
-                <UCheckbox :model-value="addServers.includes(s.id)" @update:model-value="toggleIn(addServers, s.id, $event as boolean)" />
-                <span class="truncate">{{ s.name }}</span>
-              </label>
+            <div v-else class="max-h-48 overflow-y-auto rounded-md border border-default divide-y divide-default">
+              <div v-for="s in serverOptions" :key="s.id" class="flex items-center gap-2 px-2.5 py-1.5 text-sm hover:bg-elevated/50">
+                <label class="flex min-w-0 flex-1 cursor-pointer items-center gap-2">
+                  <UCheckbox :model-value="addServers.includes(s.id)" @update:model-value="toggleIn(addServers, s.id, $event as boolean)" />
+                  <span class="truncate">{{ s.name }}</span>
+                </label>
+                <USelect
+                  v-if="addServers.includes(s.id)"
+                  :model-value="prioOf(addPrios, s.id)"
+                  :items="serverPrioItems"
+                  :aria-label="t('clients.srvPrio')"
+                  :title="t('clients.srvPrioHelp')"
+                  size="xs"
+                  class="w-28 shrink-0"
+                  @update:model-value="setPrio(addPrios, s.id, $event)"
+                />
+              </div>
             </div>
           </UFormField>
           <UFormField :label="t('clients.debug')" :help="t('clients.debugHelp')">
@@ -466,11 +511,23 @@ function priorityColor (p: string): 'error' | 'primary' | 'neutral' {
               </UButton>
             </div>
             <div v-if="!serverOptions?.length" class="text-sm text-muted">{{ t('clients.serversEmpty') }}</div>
-            <div v-else class="max-h-40 overflow-y-auto rounded-md border border-default divide-y divide-default">
-              <label v-for="s in serverOptions" :key="s.id" class="flex items-center gap-2 px-2.5 py-1.5 text-sm cursor-pointer hover:bg-elevated/50">
-                <UCheckbox :model-value="editServers.includes(s.id)" @update:model-value="toggleIn(editServers, s.id, $event as boolean)" />
-                <span class="truncate">{{ s.name }}</span>
-              </label>
+            <div v-else class="max-h-48 overflow-y-auto rounded-md border border-default divide-y divide-default">
+              <div v-for="s in serverOptions" :key="s.id" class="flex items-center gap-2 px-2.5 py-1.5 text-sm hover:bg-elevated/50">
+                <label class="flex min-w-0 flex-1 cursor-pointer items-center gap-2">
+                  <UCheckbox :model-value="editServers.includes(s.id)" @update:model-value="toggleIn(editServers, s.id, $event as boolean)" />
+                  <span class="truncate">{{ s.name }}</span>
+                </label>
+                <USelect
+                  v-if="editServers.includes(s.id)"
+                  :model-value="prioOf(editPrios, s.id)"
+                  :items="serverPrioItems"
+                  :aria-label="t('clients.srvPrio')"
+                  :title="t('clients.srvPrioHelp')"
+                  size="xs"
+                  class="w-28 shrink-0"
+                  @update:model-value="setPrio(editPrios, s.id, $event)"
+                />
+              </div>
             </div>
           </UFormField>
           <UFormField :label="t('clients.debug')" :help="t('clients.debugHelp')">

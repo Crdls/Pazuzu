@@ -1,5 +1,5 @@
 import {
-  flushGatewayIpHits, flushGatewayUsage, getGatewaySessionServer, purgeGatewaySessions,
+  clientServerPriorities, flushGatewayIpHits, flushGatewayUsage, getGatewaySessionServer, purgeGatewaySessions,
   upsertGatewaySession, useDb, type ServerRow
 } from '../db.ts'
 import { loadConfig } from '../config.ts'
@@ -7,7 +7,7 @@ import { gatewayRuntime, runtime } from '../runtime.ts'
 import { allowedServerIds } from '../db.ts'
 import { hasCapacity, pickServer } from './router.ts'
 import { pickNext, type AgingMs, type QueueEntry } from './queue.ts'
-import type { ServerLoad } from './types.ts'
+import type { ClientPriority, ServerLoad } from './types.ts'
 
 /**
  * Gateway glue: live load of every engine, slot accounting, the priority
@@ -156,10 +156,12 @@ function queueHasReachableWork (now: number): boolean {
  * for work this arrival could not take itself (queued requests have priority
  * over fresh arrivals — no queue-jumping within each client's reach).
  */
-export function acquireNow (loads: ServerLoad[], preferredId: number | null, now: number): ReturnType<typeof pickServer> {
+export function acquireNow (
+  loads: ServerLoad[], preferredId: number | null, now: number, tiers?: Map<number, ClientPriority>
+): ReturnType<typeof pickServer> {
   const gw = gatewayRuntime()
   if (gw.queue.length > 0 && queueHasReachableWork(now)) return { serverId: null, affinity: false }
-  const decision = pickServer(loads, preferredId, now)
+  const decision = pickServer(loads, preferredId, now, tiers)
   if (decision.serverId != null) reserve(decision.serverId)
   return decision
 }
@@ -202,7 +204,7 @@ export function dispatch (): void {
     const pick = pickNext(movable, now, gw.served, AGING)
     if (!pick) return
     const task = movable[pick.index]!
-    const decision = pickServer(loadsForClient(loads, task.clientId), task.preferredId, now)
+    const decision = pickServer(loadsForClient(loads, task.clientId), task.preferredId, now, clientServerPriorities(task.clientId))
     if (decision.serverId == null) return // the strict head cannot move — nobody jumps the lane
     gw.served.set(task.clientId, (gw.served.get(task.clientId) ?? 0) + 1)
     gw.queue.splice(gw.queue.indexOf(task), 1)
