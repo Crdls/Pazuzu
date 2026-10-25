@@ -70,14 +70,12 @@ export interface GatewayClientRow {
 export interface Settings {
   scrapeIntervalS: number
   rollupIntervalS: number
-  rawRetentionH: number
   hourlyRetentionD: number
 }
 
 export const SETTINGS_DEFAULTS: Settings = {
   scrapeIntervalS: 10,
   rollupIntervalS: 30,
-  rawRetentionH: 48,
   hourlyRetentionD: 400
 }
 
@@ -127,6 +125,7 @@ CREATE TABLE IF NOT EXISTS samples (
   value     REAL NOT NULL
 );
 CREATE INDEX IF NOT EXISTS idx_samples_lookup ON samples (server_id, metric, ts);
+CREATE INDEX IF NOT EXISTS idx_samples_ts ON samples (ts);
 CREATE TABLE IF NOT EXISTS rollup_hourly (
   server_id INTEGER NOT NULL,
   hour      INTEGER NOT NULL,
@@ -244,7 +243,6 @@ export function getSettings (): Settings {
   return {
     scrapeIntervalS: Number(stored.scrape_interval_s ?? SETTINGS_DEFAULTS.scrapeIntervalS),
     rollupIntervalS: Number(stored.rollup_interval_s ?? SETTINGS_DEFAULTS.rollupIntervalS),
-    rawRetentionH: Number(stored.raw_retention_h ?? SETTINGS_DEFAULTS.rawRetentionH),
     hourlyRetentionD: Number(stored.hourly_retention_d ?? SETTINGS_DEFAULTS.hourlyRetentionD)
   }
 }
@@ -254,7 +252,6 @@ export function saveSettings (patch: Partial<Settings>): Settings {
   const map: Record<keyof Settings, string> = {
     scrapeIntervalS: 'scrape_interval_s',
     rollupIntervalS: 'rollup_interval_s',
-    rawRetentionH: 'raw_retention_h',
     hourlyRetentionD: 'hourly_retention_d'
   }
   for (const key of Object.keys(map) as Array<keyof Settings>) {

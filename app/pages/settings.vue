@@ -54,8 +54,9 @@ watch(tabs, (items) => {
       </template>
 
       <template #system>
-        <div class="pt-5">
+        <div class="pt-5 space-y-6">
           <SettingsConfigCard />
+          <SettingsStorageCard />
         </div>
       </template>
 

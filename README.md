@@ -29,11 +29,11 @@ that load-balances application calls across all your engines.
   per browser (cookie).
 - **Settings** — split into tabs (each linkable directly via `?tab=`):
   **Personal** (appearance, language, password, view-as), **Data collection** (poller
-  and rollup intervals — 30 s by default — plus retention depth for raw data
-  and hourly aggregates, all applied on the fly; admins only while auth is
-  on), **System** (edits `config.json` straight from the browser; superadmins
-  only while auth is on — values take effect immediately, only the database
-  path waits for a restart) and **Updates**.
+  and rollup intervals — 30 s by default — plus hourly retention, all applied
+  on the fly; admins only while auth is on), **System** (edits `config.json`
+  straight from the browser and holds the database-maintenance card with the
+  "Clean up now" button; superadmins only while auth is on — config values take
+  effect immediately, only the database path waits for a restart) and **Updates**.
 - **Self-update** — the sidebar shows the running commit, `origin` is checked
   every 6 hours, and an "Update & restart" button in the sidebar footer (also
   in Settings → Updates) pulls, rebuilds and restarts the server in one click
@@ -166,9 +166,10 @@ With auth enabled:
   is allowed to its creator and to admins only (with auth off everybody
   may do everything, as before);
 - on the Settings page the **Data collection** tab (interval and retention settings) is
-  editable by admins only and the **System** tab (edits `config.json`) by
-  superadmins only — tabs a role cannot edit are not shown at all; the
-  **Personal** tab (password, appearance) stays available to everyone;
+  editable by admins only and the **System** tab (edits `config.json`, runs
+  the database cleanup) by superadmins only — tabs a role cannot edit are not
+  shown at all; the **Personal** tab (password, appearance) stays available
+  to everyone;
 - **View as** (Settings): an admin can temporarily look at the whole UI as a
   plain user, a superadmin also as an admin — for testing and for doing
   risky things without admin powers. The mask applies to the current session
@@ -330,11 +331,29 @@ or on the Settings page, in the **System** tab.
 
 ## Data storage
 
-| tier | resolution | default retention |
+| tier | resolution | retention |
 |---|---|---|
-| `samples` | every poller cycle (~10 s) | 48 hours |
+| `samples` | every poller cycle (~10 s) | forever, thinned by age (below) |
 | `rollup_hourly` | hourly buckets (avg/max/min) | 400 days |
 | `rollup_daily` | daily buckets | forever |
+
+`samples` is a multi-resolution archive: the rollup loop thins rows as they
+age into one row per window holding the average of the collapsed neighbours —
+**1 min** after a day, **10 min** after 3 days, **1 h** after a week, **3 h**
+after a month, **12 h** after 3 months, **1 day** after a year. Windows are
+per series and per label set, aligned to the epoch, and only fully aged
+windows collapse, so neighbouring series never mix and the hourly rollups
+(recomputed from the freshest 3 h of raw data) stay exact. The database grows
+fast at first and then ever more slowly — after a year each series costs one
+row a day.
+
+Histogram `*_bucket` series are stored once a minute rather than every scrape
+(the live snapshots still carry them all). A `VACUUM` runs automatically at
+most daily when a lot of pages have been freed; the Settings → System card
+shows the database size and row counts and lets a superadmin run the whole
+cleanup (rollups + thinning + `VACUUM`) by hand via "Clean up now", and
+`scripts/prune.mjs` does the same once from the command line (also dropping
+legacy 10-second `*_bucket` rows).
 
 Counters (`*_total`) are turned into rates (`derived:*`) while scraping:
 `gen_tok_s`, `prompt_tok_s`, `req_s`, window averages `_sum/_count` for
@@ -350,18 +369,24 @@ app/            Vue 3 + Nuxt UI frontend
 i18n/locales/   dictionaries: en, ru, de, es, fr, zh
 server/
   middleware/   auth.ts - session gate for /api (opt-in via config.json)
-  utils/        Prometheus parser, SQLite, metric catalog, scraper, rollups,
-                auth primitives, permission rules, GitLab OAuth helpers,
-                gateway/ (routing, priority queue, session affinity, proxy)
+  utils/        Prometheus parser, SQLite, metric catalog, scraper, rollups and
+                multi-resolution thinning, auth primitives, permission rules,
+                GitLab OAuth helpers, gateway/ (routing, priority queue,
+                session affinity, proxy)
   plugins/      background loops (scrape, rollups, gateway, update check)
-  api/          servers CRUD, live, range, heatmap, settings, config, auth,
-                users, gateway (status, clients, rotate, IPs),
-                update (status/check/apply)
+  api/          servers CRUD, live, range, heatmap, settings, config, storage
+                (stats + cleanup), auth, users, gateway (status, clients,
+                rotate, IPs), update (status/check/apply)
   routes/       _ws.ts WebSocket endpoint, v1/[...].ts gateway proxy
 scripts/        reset-password.mjs - lost password recovery (no email)
                 autoupdate.mjs - applied by the Update button: pull + install
                                  + build + restart (log: data/update.log)
-test/           parser test on real /metrics fixtures + auth/config/gateway/client-access/update tests
+                prune.mjs - one-shot: drop legacy *_bucket rows, then full
+                            cleanup (thinning + VACUUM); run while stopped
+                seed-history.mjs - retro-fill synthetic sine history to
+                                   exercise the thinning ladder (dev tool)
+test/           parser test on real /metrics fixtures + auth/config/gateway/
+                client-access/update/metrics/thin tests
 update.sh|.bat  one-shot install/update: pull + install --omit=dev + build
 ```
 
@@ -373,6 +398,7 @@ update.sh|.bat  one-shot install/update: pull + install --omit=dev + build
 - `GET /api/heatmap?metric&period=1h|3h|12h|24h|7d|30d|1y` — servers × buckets matrix
 - `GET|PUT /api/settings` (`PUT`: admin only when auth is on)
 - `GET|PUT /api/config` — read and rewrite `config.json` (superadmin only when auth is on; everything except `db.path` applies immediately)
+- `GET /api/storage` — database size and row counts; `POST /api/storage/cleanup` — out-of-band cleanup: rollups, full thinning, `VACUUM` (superadmin only when auth is on)
 - `GET /api/update/status` — running commit and update availability; `POST /api/update/check` — re-check now; `POST /api/update/apply` — pull, rebuild and restart via `scripts/autoupdate.mjs` (admin only when auth is on; disabled in dev mode)
 - `/api/auth/status|setup|login|logout|password` — auth (public: status, setup, login, logout)
 - `POST /api/auth/view-as` — mask the current session as a lower role (`user`; superadmins also `admin`; `null` drops the mask)
@@ -393,6 +419,8 @@ node test/config.test.mjs
 node test/gateway.test.mjs
 node test/client-access.test.mjs
 node test/update.test.mjs
+node test/metrics.test.mjs
+node test/thin.test.mjs
 ```
 
 ## Notes

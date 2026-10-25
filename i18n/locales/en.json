@@ -168,13 +168,26 @@
     "scrapeHelp": "How often every enabled server's /metrics is polled. 2–600.",
     "rollup": "Rollup interval (seconds)",
     "rollupHelp": "How often raw samples are downsampled into hourly/daily aggregates and old raw data is pruned. 5–3600.",
-    "rawRetention": "Raw data retention (hours)",
-    "rawRetentionHelp": "Raw samples older than this are deleted. Drives the 1h–24h heatmaps and short-range charts. 1–720.",
     "hourlyRetention": "Hourly rollup retention (days)",
     "hourlyRetentionHelp": "Hourly aggregates older than this are deleted. Daily aggregates are kept forever. 7–3650.",
     "toastSaved": "Settings saved",
     "toastApplied": "New intervals take effect immediately",
     "toastSaveFailed": "Could not save settings"
+  },
+  "storage": {
+    "title": "Database maintenance",
+    "description": "Raw samples are thinned as they age: 1 minute after a day, 10 minutes after 3 days, 1 hour after a week, 3 hours after a month, 12 hours after 3 months, 1 day after a year. The archive stays — it just grows ever more slowly.",
+    "dbSize": "Database size",
+    "samples": "Raw rows",
+    "hourly": "Hourly rows",
+    "daily": "Daily rows",
+    "lastVacuum": "Last compaction",
+    "never": "never",
+    "clean": "Clean up now",
+    "cleanHelp": "Runs the rollups, thins every aged tier and compacts the database file. Can block the server for a few seconds.",
+    "toastCleaned": "Cleanup done",
+    "toastFreed": "{mb} MB freed",
+    "toastCleanFailed": "Could not run the cleanup"
   },
   "config": {
     "title": "System configuration",

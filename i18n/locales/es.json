@@ -168,13 +168,26 @@
     "scrapeHelp": "Cada cuánto se consulta /metrics de cada servidor activo. 2–600.",
     "rollup": "Intervalo de rollup (segundos)",
     "rollupHelp": "Cada cuánto las muestras crudas se agregan por hora/día y se podan. 5–3600.",
-    "rawRetention": "Retención de datos crudos (horas)",
-    "rawRetentionHelp": "Las muestras más antiguas se eliminan. Afecta a los mapas de 1–24 h y rangos cortos. 1–720.",
     "hourlyRetention": "Retención de rollups horarios (días)",
     "hourlyRetentionHelp": "Los agregados horarios más antiguos se eliminan. Los diarios se conservan. 7–3650.",
     "toastSaved": "Ajustes guardados",
     "toastApplied": "Los nuevos intervalos se aplican de inmediato",
     "toastSaveFailed": "No se pudieron guardar los ajustes"
+  },
+  "storage": {
+    "title": "Mantenimiento de la base de datos",
+    "description": "Los datos brutos antiguos se ralean con la edad: 1 minuto tras un día, 10 minutos tras 3 días, 1 hora tras una semana, 3 horas tras un mes, 12 horas tras 3 meses, 1 día tras un año. El archivo se conserva, solo crece cada vez más despacio.",
+    "dbSize": "Tamaño de la base de datos",
+    "samples": "Filas de datos brutos",
+    "hourly": "Filas horarias",
+    "daily": "Filas diarias",
+    "lastVacuum": "Última compactación",
+    "never": "nunca",
+    "clean": "Limpiar ahora",
+    "cleanHelp": "Ejecuta los rollups, ralea todos los niveles y compacta el archivo de la base de datos. Puede bloquear el servidor unos segundos.",
+    "toastCleaned": "Limpieza realizada",
+    "toastFreed": "{mb} MB liberados",
+    "toastCleanFailed": "No se pudo limpiar"
   },
   "config": {
     "title": "Configuración del sistema",

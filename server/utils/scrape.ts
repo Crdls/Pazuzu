@@ -1,6 +1,6 @@
 import { normalizeLabels, parsePrometheus, type Sample } from './parse'
 import { useDb, type ServerRow } from './db'
-import { BUSY_PCT, COUNTER_RATES, HIST_WINDOW_AVG } from './metrics'
+import { BUSY_PCT, COUNTER_RATES, HIST_WINDOW_AVG, isBucketSeries, storeBucketSeries } from './metrics'
 import { runtime, type Snapshot } from './runtime'
 
 /** Base URL -> metrics endpoint URL. */
@@ -100,12 +100,15 @@ function buildRows (serverId: number, now: number, samples: Sample[]): Array<[st
   return rows
 }
 
-function insertSamples (serverId: number, ts: number, rows: Array<[string, string, number]>) {
+function insertSamples (serverId: number, ts: number, rows: Array<[string, string, number]>, storeBuckets: boolean) {
   const db = useDb()
   const stmt = db.prepare('INSERT INTO samples (server_id, ts, metric, labels, value) VALUES (?, ?, ?, ?, ?)')
   db.transaction((list: Array<[string, string, number]>) => {
     for (const [metric, labels, value] of list) {
-      if (Number.isFinite(value)) stmt.run(serverId, ts, metric, labels, value)
+      if (!Number.isFinite(value)) continue
+      // histogram buckets are only stored on the minute (the live snapshot keeps them all)
+      if (!storeBuckets && isBucketSeries(metric)) continue
+      stmt.run(serverId, ts, metric, labels, value)
     }
   })(rows)
 }
@@ -132,7 +135,7 @@ export async function scrapeServer (server: ServerRow): Promise<Snapshot> {
     const { samples } = parsePrometheus(text)
     if (samples.length === 0) throw new Error('response contained no samples')
     const rows = buildRows(server.id, now, samples)
-    insertSamples(server.id, now, rows)
+    insertSamples(server.id, now, rows, storeBucketSeries(rt.prevTs.get(server.id), now))
     rt.prevTs.set(server.id, now)
     snapshot = { serverId: server.id, ts: now, up: true, metrics: groupRows(rows) }
   } catch (err) {

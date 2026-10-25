@@ -33,6 +33,14 @@ interface Runtime {
   gateway?: GatewayRuntime
   /** version check/update state, see server/utils/update.ts */
   update?: UpdateRuntime
+  /** database maintenance state, see server/utils/rollup.ts */
+  storage?: StorageRuntime
+}
+
+/** Process-wide database maintenance state (see server/utils/rollup.ts). */
+export interface StorageRuntime {
+  /** ts of the last VACUUM (auto or manual); the auto one runs at most daily */
+  lastVacuumTs: number
 }
 
 /** Outcome of one autoupdate run, written by scripts/autoupdate.mjs. */
@@ -131,6 +139,7 @@ export function runtime (): Runtime {
       lastUpdate: null
     }
   }
+  if (!rt.storage) rt.storage = { lastVacuumTs: 0 }
   return rt
 }
 

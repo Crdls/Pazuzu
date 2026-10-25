@@ -2,7 +2,6 @@
 interface Settings {
   scrapeIntervalS: number
   rollupIntervalS: number
-  rawRetentionH: number
   hourlyRetentionD: number
 }
 
@@ -14,7 +13,7 @@ const { data, refresh } = useFetch<Settings>('/api/settings', {
   headers: useRequestHeaders(['cookie'])
 })
 
-const form = reactive<Settings>({ scrapeIntervalS: 10, rollupIntervalS: 30, rawRetentionH: 48, hourlyRetentionD: 400 })
+const form = reactive<Settings>({ scrapeIntervalS: 10, rollupIntervalS: 30, hourlyRetentionD: 400 })
 watchEffect(() => {
   if (data.value) Object.assign(form, data.value)
 })
@@ -48,10 +47,6 @@ async function save () {
 
       <UFormField :label="t('settings.rollup')" :help="t('settings.rollupHelp')">
         <UInputNumber v-model="form.rollupIntervalS" :min="5" :max="3600" :step="5" class="w-40" />
-      </UFormField>
-
-      <UFormField :label="t('settings.rawRetention')" :help="t('settings.rawRetentionHelp')">
-        <UInputNumber v-model="form.rawRetentionH" :min="1" :max="720" :step="1" class="w-40" />
       </UFormField>
 
       <UFormField :label="t('settings.hourlyRetention')" :help="t('settings.hourlyRetentionHelp')">

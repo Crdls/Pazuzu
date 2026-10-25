@@ -6,7 +6,6 @@ import { scheduleRollups, scheduleScrape } from '../utils/scheduler'
 const LIMITS: Record<keyof Settings, [number, number]> = {
   scrapeIntervalS: [2, 600],
   rollupIntervalS: [5, 3600],
-  rawRetentionH: [1, 720],
   hourlyRetentionD: [7, 3650]
 }
 

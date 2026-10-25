@@ -168,13 +168,26 @@
     "scrapeHelp": "Fréquence de lecture de /metrics de chaque serveur actif. 2–600.",
     "rollup": "Intervalle d'agrégation (secondes)",
     "rollupHelp": "Fréquence de downsampling des échantillons bruts en agrégats horaires/journaliers et de purge. 5–3600.",
-    "rawRetention": "Rétention des données brutes (heures)",
-    "rawRetentionHelp": "Les échantillons plus anciens sont supprimés. Affecte les cartes de 1–24 h et les plages courtes. 1–720.",
     "hourlyRetention": "Rétention des agrégats horaires (jours)",
     "hourlyRetentionHelp": "Les agrégats horaires plus anciens sont supprimés. Les quotidiens sont conservés. 7–3650.",
     "toastSaved": "Réglages enregistrés",
     "toastApplied": "Les nouveaux intervalles s'appliquent immédiatement",
     "toastSaveFailed": "Impossible d'enregistrer les réglages"
+  },
+  "storage": {
+    "title": "Maintenance de la base de données",
+    "description": "Les données brutes anciennes s'éclaircissent avec l'âge : 1 minute après un jour, 10 minutes après 3 jours, 1 heure après une semaine, 3 heures après un mois, 12 heures après 3 mois, 1 jour après un an. L'archive reste, elle pousse juste de plus en plus lentement.",
+    "dbSize": "Taille de la base",
+    "samples": "Lignes brutes",
+    "hourly": "Lignes horaires",
+    "daily": "Lignes quotidiennes",
+    "lastVacuum": "Dernière compression",
+    "never": "jamais",
+    "clean": "Nettoyer maintenant",
+    "cleanHelp": "Exécute les rollups, éclaircit tous les paliers et compacte le fichier de base. Peut bloquer le serveur quelques secondes.",
+    "toastCleaned": "Nettoyage terminé",
+    "toastFreed": "{mb} Mo libérés",
+    "toastCleanFailed": "Le nettoyage a échoué"
   },
   "config": {
     "title": "Configuration système",

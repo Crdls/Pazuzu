@@ -27,9 +27,10 @@
   tok/s、队列、显存 %、功耗、命中率等）。时间范围和指标会在浏览器中记住（cookie）。
 - **设置** — 分为多个标签页（任意一页都可用 `?tab=` 链接直接打开）：
   **个人**（外观、语言、密码、角色预览）、**数据采集**（轮询间隔和汇总间隔
-  — 默认 30 秒 — 以及原始数据和小时聚合的保留深度，修改后立即生效；
-  开启验证后仅管理员可改）、**系统**（可直接在浏览器中编辑 `config.json`；
-  开启验证后仅超级管理员，保存即生效——只有数据库路径需要重启）和 **更新**。
+  — 默认 30 秒 — 以及小时聚合的保留深度，修改后立即生效；
+  开启验证后仅管理员可改）、**系统**（可直接在浏览器中编辑 `config.json`，
+  还有带「立即清理」按钮的数据库维护卡片；开启验证后仅超级管理员，
+  配置保存即生效——只有数据库路径需要重启）和 **更新**。
 - **自更新** — 侧栏显示当前构建的提交，每 6 小时检查一次
   `origin`，侧栏底部的"更新并重启"按钮（设置中也有）一键拉取新代码、
   重新构建并重启服务器（开启验证后仅管理员）。
@@ -137,7 +138,7 @@ NITRO_HOST=0.0.0.0 NITRO_PORT=3003 node .output/server/index.mjs
 - 服务器会记住创建者：只有创建者和管理员可以编辑、删除和启停服务器
   （验证关闭时所有人照旧可操作）；
 - 设置页面中的「数据采集」标签页（轮询间隔和数据保留）仅管理员可用，「系统」标签页
-  （编辑 `config.json`）仅超级管理员可用 — 角色无权访问的标签页完全不显示，
+  （编辑 `config.json` 和清理数据库）仅超级管理员可用 — 角色无权访问的标签页完全不显示，
   「个人」标签页（密码、外观）所有人可用；
 - 「角色预览」（设置页面）：管理员可临时以普通用户身份查看整个界面，
   超级管理员还可以以管理员身份查看 — 便于测试，也便于放心尝试危险操作。
@@ -275,11 +276,25 @@ Authorization: Bearer pzz_…
 
 ## 数据存储
 
-| 层级 | 粒度 | 默认保留期 |
+| 层级 | 粒度 | 保留期 |
 |---|---|---|
-| `samples` | 每个轮询周期（约 10 秒） | 48 小时 |
+| `samples` | 每个轮询周期（约 10 秒） | 永久，随年龄降采样（见下） |
 | `rollup_hourly` | 小时桶（avg/max/min） | 400 天 |
 | `rollup_daily` | 天桶 | 永久 |
+
+`samples` 是一个分辨率随年龄变化的归档：汇总循环会按行龄降采样，
+每个时间窗只保留一行、值为被合并邻居的平均值 — 1 天后为 **1 分钟**，
+3 天后为 **10 分钟**，1 周后为 **1 小时**，1 个月后为 **3 小时**，
+3 个月后为 **12 小时**，1 年后为 **1 天**。时间窗按序列和标签集划分、
+对齐纪元，且只折叠完全"成熟"的窗口，因此相邻序列不会混合，小时汇总
+（按最新 3 小时原始数据重算）也保持精确。数据库起初增长很快，之后
+越来越慢 — 一年之后每条序列每天只占一行。
+
+直方图 `*_bucket` 序列每分钟存一次而不是每次采集（实时快照仍包含
+全部数据）。当释放的页很多时每天最多自动执行一次 `VACUUM`；
+「设置 → 系统」卡片显示数据库大小和行数，超级管理员可用「立即清理」
+按钮手动执行完整清理（汇总 + 降采样 + `VACUUM`），`scripts/prune.mjs`
+则从命令行一次性做同样的事（外加删除遗留的 10 秒级 `*_bucket` 行）。
 
 采集时计数器（`*_total`）会被转换为速率（`derived:*`）：
 `gen_tok_s`、`prompt_tok_s`、`req_s`、TTFT / ITL / E2E 的窗口平均值
@@ -295,17 +310,21 @@ app/            Vue 3 + Nuxt UI 前端
 i18n/locales/   语言词典：en、ru、de、es、fr、zh
 server/
   middleware/   auth.ts — /api 的会话关卡（由 config.json 开启）
-  utils/        Prometheus 解析器、SQLite、指标目录、采集器、汇总、认证原语、
-                权限规则、GitLab OAuth 辅助、gateway/（路由、优先级队列、会话亲和、代理）
+  utils/        Prometheus 解析器、SQLite、指标目录、采集器、汇总与多级降采样、
+                认证原语、权限规则、GitLab OAuth 辅助、gateway/（路由、优先级队列、会话亲和、代理）
   plugins/      后台循环（scrape、rollups、gateway、更新检查）
-  api/          servers CRUD、live、range、heatmap、settings、config、auth、
-                users、gateway（状态、客户端、轮换、IP）、
+  api/          servers CRUD、live、range、heatmap、settings、config、storage
+                （统计 + 清理）、auth、users、gateway（状态、客户端、轮换、IP）、
                 update（status/check/apply）
   routes/       _ws.ts WebSocket 端点、v1/[...].ts 网关代理
 scripts/        reset-password.mjs — 密码恢复（无需邮箱）
                 autoupdate.mjs — "更新"按钮执行：pull + install + build + 重启
                                  （日志：data/update.log）
-test/           基于真实 /metrics 固定数据的解析器测试 + 认证/配置/网关/更新测试
+                prune.mjs — 一次性：删除遗留 *_bucket 行并完整清理
+                           （降采样 + VACUUM）；请在服务器停止时运行
+                seed-history.mjs — 回填合成正弦历史数据，用于验证
+                                   降采样阶梯（开发工具）
+test/           基于真实 /metrics 固定数据的解析器测试 + 认证/配置/网关/更新/指标目录/降采样测试
 update.sh|.bat  一键安装/更新：pull + install --omit=dev + build
 ```
 
@@ -317,6 +336,7 @@ update.sh|.bat  一键安装/更新：pull + install --omit=dev + build
 - `GET /api/heatmap?metric&period=1h|3h|12h|24h|7d|30d|1y` — 服务器 × 时间桶矩阵
 - `GET|PUT /api/settings`（`PUT`：开启验证后仅管理员）
 - `GET|PUT /api/config` — 读取并重写 `config.json`（开启验证后仅超级管理员；除 `db.path` 外全部立即生效）
+- `GET /api/storage` — 数据库大小与行数；`POST /api/storage/cleanup` — 手动清理：汇总、全量降采样、`VACUUM`（开启验证后仅超级管理员）
 - `GET /api/update/status` — 当前提交与更新可用性；`POST /api/update/check` — 立即重新检查；`POST /api/update/apply` — 通过 `scripts/autoupdate.mjs` 拉取、构建并重启（开启验证后仅管理员；开发模式下禁用）
 - `/api/auth/status|setup|login|logout|password` — 身份验证（公开：status、setup、login、logout）
 - `POST /api/auth/view-as` — 将当前会话伪装为更低角色（`user`；超级管理员还可 `admin`；`null` 取消伪装）
@@ -337,6 +357,8 @@ node test/config.test.mjs
 node test/gateway.test.mjs
 node test/client-access.test.mjs
 node test/update.test.mjs
+node test/metrics.test.mjs
+node test/thin.test.mjs
 ```
 
 ## 备注

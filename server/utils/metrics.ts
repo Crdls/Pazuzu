@@ -89,3 +89,17 @@ export const BUSY_PCT: Record<string, string> = {
   'strata:totals_decode_seconds_total': 'derived:decode_busy_pct',
   'strata:totals_prompt_seconds_total': 'derived:prefill_busy_pct'
 }
+
+/** histogram bucket series - cumulative counters, expensive and unqueried */
+export function isBucketSeries (metric: string): boolean {
+  return metric.endsWith('_bucket')
+}
+
+/**
+ * Histogram buckets are stored once a minute instead of every scrape: one
+ * snapshot per minute is enough to reconstruct distributions later. True when
+ * this scrape crosses a minute boundary (or is the server's first scrape).
+ */
+export function storeBucketSeries (prevTs: number | undefined, now: number): boolean {
+  return prevTs === undefined || Math.floor(now / 60_000) > Math.floor(prevTs / 60_000)
+}

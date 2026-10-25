@@ -168,13 +168,26 @@
     "scrapeHelp": "Wie oft der /metrics-Endpunkt jedes aktiven Servers abgefragt wird. 2–600.",
     "rollup": "Rollup-Intervall (Sekunden)",
     "rollupHelp": "Wie oft Rohdaten zu Stunden-/Tagesaggregaten verdichtet und alte Daten gelöscht werden. 5–3600.",
-    "rawRetention": "Rohdaten-Aufbewahrung (Stunden)",
-    "rawRetentionHelp": "Ältere Rohdaten werden gelöscht. Beeinflusst 1–24-h-Heatmaps und kurze Bereiche. 1–720.",
     "hourlyRetention": "Stunden-Rollups aufbewahren (Tage)",
     "hourlyRetentionHelp": "Ältere Stundenaggregate werden gelöscht. Tagesaggregate bleiben dauerhaft. 7–3650.",
     "toastSaved": "Einstellungen gespeichert",
     "toastApplied": "Neue Intervalle gelten sofort",
     "toastSaveFailed": "Einstellungen konnten nicht gespeichert werden"
+  },
+  "storage": {
+    "title": "Datenbank-Wartung",
+    "description": "Alte Rohdaten werden mit dem Alter verdichtet: nach 1 Tag auf 1 Minute, nach 3 Tagen auf 10 Minuten, nach 1 Woche auf 1 Stunde, nach 1 Monat auf 3 Stunden, nach 3 Monaten auf 12 Stunden, nach 1 Jahr auf 1 Tag. Das Archiv bleibt – es wächst nur immer langsamer.",
+    "dbSize": "Datenbankgröße",
+    "samples": "Rohdaten-Zeilen",
+    "hourly": "Stunden-Zeilen",
+    "daily": "Tages-Zeilen",
+    "lastVacuum": "Letzte Komprimierung",
+    "never": "nie",
+    "clean": "Jetzt aufräumen",
+    "cleanHelp": "Führt Rollups aus, verdichtet alle Altersstufen und komprimiert die Datenbankdatei. Kann den Server einige Sekunden blockieren.",
+    "toastCleaned": "Aufräumen abgeschlossen",
+    "toastFreed": "{mb} MB freigegeben",
+    "toastCleanFailed": "Aufräumen fehlgeschlagen"
   },
   "config": {
     "title": "Systemkonfiguration",
