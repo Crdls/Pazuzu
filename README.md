@@ -27,12 +27,13 @@ that load-balances application calls across all your engines.
   1h / 3h / 12h / 24h / 7d / 30d / year, selectable metric (GPU util, CPU, tok/s,
   queue, VRAM %, power, hit rate, etc.). Period and metric are remembered
   per browser (cookie).
-- **Settings** — poller interval and rollup interval (30 s by default),
-  retention depth for raw data and hourly aggregates, all applied on the
-  fly; the **System configuration** card on the same page edits
-  `config.json` straight from the browser (superadmins only while auth is
-  on) — values take effect immediately, only the database path waits for a
-  restart.
+- **Settings** — split into tabs (each linkable directly via `?tab=`):
+  **Personal** (appearance, language, password, view-as), **Data collection** (poller
+  and rollup intervals — 30 s by default — plus retention depth for raw data
+  and hourly aggregates, all applied on the fly; admins only while auth is
+  on), **System** (edits `config.json` straight from the browser; superadmins
+  only while auth is on — values take effect immediately, only the database
+  path waits for a restart) and **Updates**.
 - **Self-update** — the sidebar shows the running commit, `origin` is checked
   every 6 hours, and an "Update & restart" button in the sidebar footer (also
   in Settings → Updates) pulls, rebuilds and restarts the server in one click
@@ -134,10 +135,10 @@ System-level settings live in `config.json` next to the project root — copy
 The file is optional (absent = defaults: `data/data.db`, auth off).
 `auth.enabled` applies as soon as the file changes; `db.path` applies at
 startup — restart after changing it (relative paths resolve from the project
-root). Superadmins can also edit all of this from the **System configuration**
-card on the Settings page: saving rewrites `config.json` in place (extra
+root). Superadmins can also edit all of this from the **System** tab on the
+Settings page: saving rewrites `config.json` in place (extra
 keys added by hand survive it) and the values apply immediately — only
-`db.path` needs a restart. With auth off the card is open to everyone on
+`db.path` needs a restart. With auth off the tab is open to everyone on
 the network, like the rest of the app.
 
 With auth enabled:
@@ -164,10 +165,10 @@ With auth enabled:
 - servers remember who added them: editing, deleting and toggling a server
   is allowed to its creator and to admins only (with auth off everybody
   may do everything, as before);
-- the interval and retention settings on the Settings page are editable by
-  admins only, the **System configuration** card (edits `config.json`) by
-  superadmins only (the password and appearance cards stay available to
-  everyone);
+- on the Settings page the **Data collection** tab (interval and retention settings) is
+  editable by admins only and the **System** tab (edits `config.json`) by
+  superadmins only — tabs a role cannot edit are not shown at all; the
+  **Personal** tab (password, appearance) stays available to everyone;
 - **View as** (Settings): an admin can temporarily look at the whole UI as a
   plain user, a superadmin also as an admin — for testing and for doing
   risky things without admin powers. The mask applies to the current session
@@ -257,7 +258,7 @@ in `config.json`:
 "gateway": { "enabled": true }
 ```
 
-or on the Settings page, in the **System configuration** card.
+or on the Settings page, in the **System** tab.
 
 - **Clients** — the **Clients** page (admins only when auth is on) manages
   the API tokens that may call the gateway: an auto-generated `pzz_…` key
@@ -323,8 +324,7 @@ or on the Settings page, in the **System configuration** card.
   a bytes/4 estimate — stats, not billing.
 - The `gateway` section of `config.json` accepts `queueTimeoutS`,
   `queueMax`, `queueMaxPerClient`, `sessionIdleMin`, `defaultCapacity` and
-  `ejectionS`; the same fields are in the Settings → System configuration
-  card.
+  `ejectionS`; the same fields are in the Settings → System tab.
 
 </details>
 
