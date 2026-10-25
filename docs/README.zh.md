@@ -3,7 +3,8 @@
 [English](../README.md) · [Русский](README.ru.md) · **中文**
 
 **[Strata](https://github.com/Niko1221/Strata)** 推理引擎的 Web
-监控系统：多服务器、实时仪表盘、指标历史，以及可选时间范围的负载热力图。
+监控系统：多服务器、实时仪表盘、指标历史，以及可选时间范围的负载热力图 ——
+还有一个可选的 OpenAI 兼容统一端点，把应用请求均衡地分给所有引擎。
 
 ![仪表盘](images/dashboard-zh.png)
 
@@ -15,7 +16,8 @@
   （例如 `http://192.168.10.76:8000`），指标从 `/metrics` 读取
   （Prometheus 文本格式，需要 `Accept: text/plain` 请求头）。
   可选的 API 密钥以 `Bearer` 令牌发送——新版 Strata
-  对外暴露的服务器要求提供。
+  对外暴露的服务器要求提供。「测试」按钮可立即确认引擎是否可达、
+  `/metrics` 能否正常解析。
 - **实时仪表盘** — 引擎状态（idle / reading / generating）、
   tok/s、队列、KV 缓存，每块 GPU：利用率 / 显存 / 温度 / 功耗，
   以及主机 CPU 和内存。通过 WebSocket 更新，并支持轮询回退。
@@ -23,8 +25,9 @@
 - **热力图** — 所有服务器按时间桶的负载，
   时间范围 1 / 3 / 12 / 24 小时 / 7 天 / 30 天 / 一年，可选指标（GPU 利用率、CPU、
   tok/s、队列、显存 %、功耗、命中率等）。时间范围和指标会在浏览器中记住（cookie）。
-- **设置** — 轮询间隔和汇总间隔（默认 30 秒）、
-  原始数据和小时聚合的保留深度。修改后立即生效。
+- **设置** — 轮询间隔和汇总间隔（默认 30 秒）、原始数据和小时聚合的保留深度，
+  修改后立即生效；同页的「系统配置」卡片可直接在浏览器中编辑 `config.json`
+  （开启验证后仅管理员），保存即生效——只有数据库路径需要重启。
 - **自更新** — 侧栏显示当前构建的提交，每 6 小时检查一次
   `origin`，在设置中一键拉取新代码、重新构建并重启服务器
   （开启验证后仅管理员）。
@@ -45,8 +48,9 @@
 - **API 网关（可选）** — 一个 OpenAI 兼容端点（`/v1`）在所有引擎间负载均衡：
   按应用分配的 API 令牌（`msk_…`）、带 aging 的优先级队列、会话感知路由
   （同一会话始终落在持有其 KV 前缀缓存的引擎上）、按服务器的网关模式
-  （路由 / 排空 / 仅统计）以及来源 IP 记录。默认关闭，
-  在 `config.json` 中开启 `gateway.enabled` — 见下文「网关（负载均衡器）」。
+  （路由 / 排空 / 仅统计）以及来源 IP 记录；「客户端」页面同时也是网关控制台——
+  实时队列与各引擎负载一览。默认关闭，在 `config.json` 或设置中开启
+  `gateway.enabled` — 见下文「网关（负载均衡器）」。
 
 ## 安装
 
@@ -200,37 +204,52 @@ Authorization: Bearer msk_…
 "gateway": { "enabled": true }
 ```
 
+或在设置页面的「系统配置」卡片中开启。
+
 - **客户端** — 「客户端」页面（开启验证后仅管理员）管理允许调用网关的
-  API 令牌：自动生成 `msk_…` 密钥（只显示一次，仅存储其哈希）或使用
-  自定义令牌；令牌可停用、轮换，带有优先级和可选的调试标记，后者会给响应
-  加上 `X-Pazuzu-Server`、`X-Pazuzu-Queue-Wait-Ms`、
-  `X-Pazuzu-Session` 头。每个客户端都有请求计数和来源 IP 记录；
-  token 用量在客户端索取 `usage` 数据块（如 `stream_options.include_usage`）
-  时从引擎响应统计，否则按字节数/4 估算——是统计，不是账单。
+  API 令牌：自动生成 `msk_…` 密钥（只显示一次，仅存储其哈希）或使用自定义
+  令牌；令牌可停用、轮换，带有优先级，每个客户端都有请求计数和来源 IP 记录。
 - **客户端的服务器访问权限** — 可以限制每个客户端可用的引擎集合：在「客户端」
   页面勾选该客户可访问的服务器，在「服务器」页面勾选可使用该服务器的客户
   （两处都有「全选 / 取消全选」按钮）。新客户默认可以访问所有服务器，
-  之后新增的服务器也自动可用，除非取消勾选。在服务器页面取消一个无限制
-  客户的勾选，会将其限制为其他现有服务器。
-- **会话亲和** — 一个会话会继续由持有其 KV 前缀缓存的引擎服务：客户端发送
-  `X-Session-Id` 头时以它为准，否则以对话开头（system + 首条用户消息）的哈希
-  作为映射键；空闲超过 `sessionIdleMin`（60 分钟）的会话可能落到其他引擎。
-- **最小负载路由** — 新会话落到负载最小的引擎，每个引擎有并发上限：
-  服务器页面的「网关并发」字段，否则用引擎自身批处理槽位
-  （`strata:live_slots`），否则 `defaultCapacity`（32）。当引擎内部队列
-  堆积、KV cache 超过 95%，或刚有实时请求在其上失败（`ejectionS`，30 秒）时，
-  该服务器会暂时不接新请求。
-- **优先级队列** — 所有引擎满载时请求进入严格优先级通道（按客户端的
-  高 / 普通 / 低），同通道内按客户端公平轮转；等待会逐步提升请求
-  （低 → 普通经 30 秒，再 → 高经 5 分钟），因此不会饿死。等待超过
-  `queueTimeoutS`（60 秒）或触及队列上限的请求会收到带 `Retry-After` 的
-  OpenAI 风格 `429`。队列存在于内存中——重启 Pazuzu 会丢弃排队中的请求
-  （进行中的会正常完成）。
+  之后新增的服务器也自动可用，除非取消勾选。
+- **会话亲和** — 一个会话会继续由持有其 KV 前缀缓存的引擎服务，对话不降温、
+  缓存不浪费；空闲超过一小时的会话可能落到其他引擎。
+- **最小负载路由** — 新会话落到负载最小的引擎，每个引擎有可在服务器页面设置
+  的并发上限。当引擎内部队列堆积、KV 缓存接近占满，或刚有实时请求在其上失败
+  时，该服务器会暂时不接新请求——网关让引擎的内部队列保持为空，优先级才
+  有意义。
+- **优先级队列** — 所有引擎满载时请求进入高 / 普通 / 低通道，同通道内按
+  客户端公平轮转；等待会逐步提升请求，因此不会饿死，等得太久的请求会收到
+  礼貌的 `429` 而不是无限挂起。队列存在于内存中——重启 Pazuzu 会丢弃排队中
+  的请求（进行中的会正常完成）。
+- **网关控制台** — 「客户端」页面顶部显示端点地址、各通道排队数，以及每个
+  引擎的方块：在途请求数、是否正在排空或被暂时跳过。
 - **从网关注摘除服务器** — 服务器页面的网关模式：**路由**（默认）、
   **排空**（只完成进行中的请求）、**统计**（仅监控，网关不再转发）。
-- `config.json` 的 `gateway` 段还可调整 `queueTimeoutS`、`queueMax`（200）、
-  `queueMaxPerClient`（20）、`sessionIdleMin`、`defaultCapacity`、
-  `ejectionS`——全部有合理的默认值。
+
+<details>
+<summary>技术细节</summary>
+
+- **每服务器并发上限**：服务器页面的「网关并发」字段，否则用引擎自身批处理
+  槽位（`strata:live_slots`），否则 `defaultCapacity`（32）。
+- **临时摘除触发条件**：引擎等待队列大于零、KV 缓存 ≥ 95%，或刚有实时请求
+  在该服务器上失败（`ejectionS`，30 秒）。
+- **会话键**：客户端发送 `X-Session-Id` 头时以它为准，否则以对话开头
+  （system + 首条用户消息）的哈希为键；空闲超过 `sessionIdleMin`（60 分钟）
+  的会话可能落到其他引擎。
+- **队列 aging**：等待 30 秒后 低 → 普通，再等 5 分钟 → 高；等待超过
+  `queueTimeoutS`（60 秒）或触及 `queueMax`（200）/ `queueMaxPerClient`
+  （20）的请求收到带 `Retry-After` 的 OpenAI 风格 `429`。
+- **调试标记**会给客户端的响应加上 `X-Pazuzu-Server`、
+  `X-Pazuzu-Queue-Wait-Ms`、`X-Pazuzu-Session` 头。
+- **token 用量**在客户端索取 `usage` 数据块（如 `stream_options.include_usage`）
+  时从引擎响应统计，否则按字节数/4 估算——是统计，不是账单。
+- `config.json` 的 `gateway` 段可调整 `queueTimeoutS`、`queueMax`、
+  `queueMaxPerClient`、`sessionIdleMin`、`defaultCapacity`、`ejectionS`；
+  同样的字段也在设置页面的「系统配置」卡片里。
+
+</details>
 
 ## 数据存储
 
@@ -257,8 +276,9 @@ server/
   utils/        Prometheus 解析器、SQLite、指标目录、采集器、汇总、认证原语、
                 权限规则、GitLab OAuth 辅助、gateway/（路由、优先级队列、会话亲和、代理）
   plugins/      后台循环（scrape、rollups、gateway、更新检查）
-  api/          servers CRUD、live、range、heatmap、settings、auth、users、
-                gateway（状态、客户端、轮换、IP）、update（status/check/apply）
+  api/          servers CRUD、live、range、heatmap、settings、config、auth、
+                users、gateway（状态、客户端、轮换、IP）、
+                update（status/check/apply）
   routes/       _ws.ts WebSocket 端点、v1/[...].ts 网关代理
 scripts/        reset-password.mjs — 密码恢复（无需邮箱）
                 autoupdate.mjs — "更新"按钮执行：pull + install + build + 重启
@@ -274,6 +294,7 @@ update.sh|.bat  一键安装/更新：pull + install --omit=dev + build
 - `GET /api/range?serverId&metric&from&to` — 指标历史（raw/hourly/daily — 数据源自动选择）
 - `GET /api/heatmap?metric&period=1h|3h|12h|24h|7d|30d|1y` — 服务器 × 时间桶矩阵
 - `GET|PUT /api/settings`（`PUT`：开启验证后仅管理员）
+- `GET|PUT /api/config` — 读取并重写 `config.json`（开启验证后仅管理员；除 `db.path` 外全部立即生效）
 - `GET /api/update/status` — 当前提交与更新可用性；`POST /api/update/check` — 立即重新检查；`POST /api/update/apply` — 通过 `scripts/autoupdate.mjs` 拉取、构建并重启（开启验证后仅管理员；开发模式下禁用）
 - `/api/auth/status|setup|login|logout|password` — 身份验证（公开：status、setup、login、logout）
 - `GET /api/auth/gitlab/start` — 重定向到 GitLab；`GET /api/auth/gitlab/callback` — OAuth callback：请把这一 URL 原样注册为 GitLab 应用的 redirect URI

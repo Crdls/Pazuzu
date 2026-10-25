@@ -4,7 +4,8 @@
 
 Web monitoring for **[Strata](https://github.com/Niko1221/Strata)** inference
 engines: several servers, a live dashboard, metric history and a load heatmap
-with selectable period.
+with selectable period — and, when you want it, one OpenAI-compatible endpoint
+that load-balances application calls across all your engines.
 
 ![Dashboard](docs/images/dashboard-en.png)
 
@@ -16,7 +17,8 @@ with selectable period.
   (e.g. `http://192.168.10.76:8000`), metrics are read from `/metrics`
   (Prometheus text format, `Accept: text/plain` header required).
   An optional API key is sent as a `Bearer` token — newer Strata versions
-  require it when the server is exposed to the network.
+  require it when the server is exposed to the network. The **Test** button
+  checks right away that the engine is reachable and its `/metrics` parses.
 - **Live dashboard** — engine state (idle / reading / generating),
   tok/s, queues, KV cache, per GPU: util / VRAM / temperature / power,
   plus host CPU and RAM. Updates over WebSocket with a polling fallback.
@@ -26,7 +28,11 @@ with selectable period.
   queue, VRAM %, power, hit rate, etc.). Period and metric are remembered
   per browser (cookie).
 - **Settings** — poller interval and rollup interval (30 s by default),
-  retention depth for raw data and hourly aggregates. Applied on the fly.
+  retention depth for raw data and hourly aggregates, all applied on the
+  fly; the **System configuration** card on the same page edits
+  `config.json` straight from the browser (admins only while auth is on) —
+  values take effect immediately, only the database path waits for a
+  restart.
 - **Self-update** — the sidebar shows the running commit, `origin` is checked
   every 6 hours, and Settings → Updates pulls, rebuilds and restarts the
   server in one click (admins while auth is on).
@@ -55,9 +61,10 @@ with selectable period.
   load-balances across all your engines: per-app API tokens (`msk_…`),
   a priority queue with aging, session-aware routing (a chat keeps hitting
   the engine that holds its KV prefix cache), per-server routing modes
-  (route / drain / stats-only) and source-IP tracking. Off by default,
-  enable with `gateway.enabled` in `config.json` — see
-  [Gateway](#gateway-load-balancer).
+  (route / drain / stats-only) and source-IP tracking; the Clients page
+  doubles as a gateway console with live queues and per-engine load. Off by
+  default, enable with `gateway.enabled` in `config.json` or on the Settings
+  page — see [Gateway](#gateway-load-balancer).
 
 ## Installation
 
@@ -231,46 +238,67 @@ in `config.json`:
 "gateway": { "enabled": true }
 ```
 
+or on the Settings page, in the **System configuration** card.
+
 - **Clients** — the **Clients** page (admins only when auth is on) manages
   the API tokens that may call the gateway: an auto-generated `msk_…` key
-  (shown exactly once, only its hash is stored) or your own token; tokens can
-  be disabled and rotated, carry a priority and an optional debug flag that
-  adds `X-Pazuzu-Server`, `X-Pazuzu-Queue-Wait-Ms` and
-  `X-Pazuzu-Session` response headers. Each client gets request counters
-  and a source-IP history; token usage is tallied from the engine's `usage`
-  chunk when the client asks for it (e.g. `stream_options.include_usage`),
-  otherwise it is a bytes/4 estimate — stats, not billing.
+  (shown exactly once, only its hash is stored) or your own token. Tokens
+  can be disabled and rotated, carry a priority, and every client gets
+  request counters and a source-IP history.
 - **Per-client server access** — each client can be limited to a set of
   engines: the Clients page picks the servers reachable by a client, the
   Servers page picks which clients a server is available to (both with
-  select-all / select-none buttons). A new client reaches every server; it
-  also keeps reaching servers added later until some are unchecked.
-  Unchecking an unrestricted client on the Servers page limits it to the
-  other current servers.
-- **Session affinity** — a chat sticks to the engine that holds its KV
-  prefix cache: the `X-Session-Id` header decides when the client sends it,
-  otherwise the hash of the conversation opening (system + first user
-  message) keys the mapping; chats idle for longer than `sessionIdleMin`
-  (60 min) may land elsewhere.
-- **Least-loaded routing** — a new chat goes to the least loaded engine,
-  each capped by concurrency: the per-server `gateway capacity` on the
-  Servers page, else the engine's own batch slots (`strata:live_slots`),
-  else `defaultCapacity` (32). A server temporarily stops taking new work
-  while the engine reports a waiting queue, its KV cache above 95%, or right
-  after a live request failed against it (`ejectionS`, 30 s).
-- **Priority queue** — when every engine is at capacity requests wait in the
-  strict-priority lanes (high / normal / low per client) with round-robin
-  fairness between clients of a lane; waiting gradually promotes a request
-  (low → normal after 30 s, then → high after 5 min more) so nobody starves.
-  A request that waited `queueTimeoutS` (60 s) or hit the queue caps gets an
-  OpenAI-style `429` with `Retry-After`. The queue lives in memory — a
-  Pazuzu restart drops waiting requests (in-flight ones finish).
+  select-all / select-none buttons). A new client reaches every server,
+  including ones added later, until some are unchecked.
+- **Session affinity** — a chat keeps hitting the engine that holds its KV
+  prefix cache, so conversations answer fast and caches stay warm; a chat
+  idle for over an hour may land on another engine.
+- **Least-loaded routing** — a new conversation goes to the least loaded
+  engine, each capped by a per-server concurrency limit settable on the
+  Servers page. A server temporarily takes no new work while its engine
+  reports a waiting queue, a nearly full KV cache, or a just-failed live
+  request — the engine's own queue stays empty, so the priorities below
+  keep meaning something.
+- **Priority queue** — when every engine is at capacity, requests wait in
+  high / normal / low lanes with fair rotation between clients of a lane;
+  waiting gradually promotes a request, so nobody starves, and one that
+  waits too long gets a polite `429` instead of hanging forever. The queue
+  lives in memory — a Pazuzu restart drops waiting requests (in-flight
+  ones finish).
+- **Gateway console** — the top of the Clients page shows the OpenAI
+  endpoint URL, how many requests wait in each lane, and a tile per
+  engine: in-flight load, whether it is draining or temporarily skipped.
 - **Detaching a server** — per-server gateway mode on the Servers page:
   **Route** (default), **Drain** (only finish in-flight requests) or
   **Stats** (monitoring only, the gateway never forwards to it).
-- The `gateway` section of `config.json` also accepts `queueTimeoutS`,
-  `queueMax` (200), `queueMaxPerClient` (20), `sessionIdleMin`,
-  `defaultCapacity` and `ejectionS` — everything has a sane default.
+
+<details>
+<summary>Technical details</summary>
+
+- **Concurrency cap** per server: the `gateway capacity` field on the
+  Servers page, else the engine's own batch slots (`strata:live_slots`),
+  else `defaultCapacity` (32).
+- **Temporary ejection triggers**: engine waiting queue > 0, KV cache
+  ≥ 95%, or a live request that just failed against the server
+  (`ejectionS`, 30 s).
+- **Session key**: the `X-Session-Id` header when the client sends it, else
+  the hash of the conversation opening (system + first user message); chats
+  idle for longer than `sessionIdleMin` (60 min) may land elsewhere.
+- **Queue aging**: low → normal after 30 s of waiting, then → high after
+  5 min more; a request that waited `queueTimeoutS` (60 s) or hit `queueMax`
+  (200) / `queueMaxPerClient` (20) gets an OpenAI-style `429` with
+  `Retry-After`.
+- **Debug flag** on a client adds `X-Pazuzu-Server`,
+  `X-Pazuzu-Queue-Wait-Ms` and `X-Pazuzu-Session` response headers.
+- **Token usage** is tallied from the engine's `usage` chunk when the
+  client asks for it (e.g. `stream_options.include_usage`), otherwise it is
+  a bytes/4 estimate — stats, not billing.
+- The `gateway` section of `config.json` accepts `queueTimeoutS`,
+  `queueMax`, `queueMaxPerClient`, `sessionIdleMin`, `defaultCapacity` and
+  `ejectionS`; the same fields are in the Settings → System configuration
+  card.
+
+</details>
 
 ## Data storage
 
@@ -298,8 +326,9 @@ server/
                 auth primitives, permission rules, GitLab OAuth helpers,
                 gateway/ (routing, priority queue, session affinity, proxy)
   plugins/      background loops (scrape, rollups, gateway, update check)
-  api/          servers CRUD, live, range, heatmap, settings, auth, users,
-                gateway (status, clients, rotate, IPs), update (status/check/apply)
+  api/          servers CRUD, live, range, heatmap, settings, config, auth,
+                users, gateway (status, clients, rotate, IPs),
+                update (status/check/apply)
   routes/       _ws.ts WebSocket endpoint, v1/[...].ts gateway proxy
 scripts/        reset-password.mjs - lost password recovery (no email)
                 autoupdate.mjs - applied by the Update button: pull + install
@@ -315,6 +344,7 @@ update.sh|.bat  one-shot install/update: pull + install --omit=dev + build
 - `GET /api/range?serverId&metric&from&to` — metric history (raw/hourly/daily — the source is picked automatically)
 - `GET /api/heatmap?metric&period=1h|3h|12h|24h|7d|30d|1y` — servers × buckets matrix
 - `GET|PUT /api/settings` (`PUT`: admin only when auth is on)
+- `GET|PUT /api/config` — read and rewrite `config.json` (admin only when auth is on; everything except `db.path` applies immediately)
 - `GET /api/update/status` — running commit and update availability; `POST /api/update/check` — re-check now; `POST /api/update/apply` — pull, rebuild and restart via `scripts/autoupdate.mjs` (admin only when auth is on; disabled in dev mode)
 - `/api/auth/status|setup|login|logout|password` — auth (public: status, setup, login, logout)
 - `GET /api/auth/gitlab/start` — redirect to GitLab; `GET /api/auth/gitlab/callback` — the OAuth callback endpoint: register exactly this URL as the redirect URI in the GitLab application
