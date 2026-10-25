@@ -57,8 +57,8 @@ export default defineEventHandler(async (event) => {
     }
 
     // empty pass_hash: no local password yet, Settings offers to set one;
-    // the very first sign-up gets the admin role, later GitLab users are plain users
-    const user = getUserByUsername(username) ?? createUser(username, '', countUsers() === 0 ? 'admin' : 'user', true)
+    // the very first sign-up gets the superadmin role, later GitLab users are plain users
+    const user = getUserByUsername(username) ?? createUser(username, '', countUsers() === 0 ? 'superadmin' : 'user', true)
     if (user.disabled) return fail('gitlab-forbidden')
     touchLastLogin(user.id)
     startSession(event, user.id)

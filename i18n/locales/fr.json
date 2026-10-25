@@ -9,7 +9,9 @@
     "menu": "Menu"
   },
   "footer": {
-    "source": "Code source"
+    "source": "Code source",
+    "viewAs": "Vue en tant que : {role}",
+    "viewAsBack": "Retour"
   },
   "common": {
     "addServer": "Ajouter un serveur",
@@ -129,6 +131,10 @@
     "language": "Langue",
     "languageAuto": "Auto (navigateur)",
     "languageHelp": "Enregistré sur votre compte ; auto suit la langue du navigateur.",
+    "viewAsTitle": "Voir en tant que",
+    "viewAsHelp": "Regardez temporairement Pazuzu avec un rôle inférieur, pratique pour tester. Le rôle réel ne change pas ; la bannière de la barre latérale ramène en un clic.",
+    "viewAs": "Mode de vue",
+    "viewAsNormal": "Normal (rôle propre)",
     "colorMode": "Mode",
     "colorScheme": "Schéma de couleurs",
     "colorSchemeHelp": "Standard utilise le thème intégré ; Personnalisé laisse choisir les palettes d'accent et neutre.",
@@ -245,6 +251,7 @@
     "addTitle": "Nouvel utilisateur",
     "gitlab": "GitLab",
     "role": "Rôle",
+    "roleSuperadmin": "Superadministrateur",
     "roleAdmin": "Admin",
     "roleUser": "Utilisateur",
     "status": "Statut",

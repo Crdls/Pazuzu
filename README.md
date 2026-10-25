@@ -30,8 +30,8 @@ that load-balances application calls across all your engines.
 - **Settings** — poller interval and rollup interval (30 s by default),
   retention depth for raw data and hourly aggregates, all applied on the
   fly; the **System configuration** card on the same page edits
-  `config.json` straight from the browser (admins only while auth is on) —
-  values take effect immediately, only the database path waits for a
+  `config.json` straight from the browser (superadmins only while auth is
+  on) — values take effect immediately, only the database path waits for a
   restart.
 - **Self-update** — the sidebar shows the running commit, `origin` is checked
   every 6 hours, and an "Update & restart" button in the sidebar footer (also
@@ -54,9 +54,9 @@ that load-balances application calls across all your engines.
   `nuxt.config.ts`.
 - **Optional authentication** — enable `auth.enabled` in `config.json`;
   accounts live in SQLite with scrypt-hashed passwords and 30-day sliding
-  sessions, with `admin`/`user` roles. With auth on and no users yet, the app
-  opens a first-run screen to create the admin account. Users can also sign
-  in through a GitLab server on the LAN (OAuth2, see
+  sessions, with `superadmin`/`admin`/`user` roles. With auth on and no users
+  yet, the app opens a first-run screen to create the superadmin account.
+  Users can also sign in through a GitLab server on the LAN (OAuth2, see
   [Authentication](#authentication)).
 - **API gateway (optional)** — one OpenAI-compatible endpoint (`/v1`) that
   load-balances across all your engines: per-app API tokens (`msk_…`),
@@ -133,7 +133,7 @@ System-level settings live in `config.json` next to the project root — copy
 The file is optional (absent = defaults: `data/data.db`, auth off).
 `auth.enabled` applies as soon as the file changes; `db.path` applies at
 startup — restart after changing it (relative paths resolve from the project
-root). Admins can also edit all of this from the **System configuration**
+root). Superadmins can also edit all of this from the **System configuration**
 card on the Settings page: saving rewrites `config.json` in place (extra
 keys added by hand survive it) and the values apply immediately — only
 `db.path` needs a restart. With auth off the card is open to everyone on
@@ -141,21 +141,37 @@ the network, like the rest of the app.
 
 With auth enabled:
 
-- no users yet → the app opens a first-run screen to create the admin account;
+- no users yet → the app opens a first-run screen to create the superadmin account;
 - every API route and the WebSocket require the `pazuzu_session` cookie
   (HttpOnly, scrypt-hashed passwords in SQLite, sessions live 30 days and
   slide on use);
-- two roles: `admin` and `user`; admins get a **Users** page where they can
-  change roles, assign a new password to anybody (without knowing the old
-  one), freeze accounts (frozen users cannot sign in and their active
-  sessions are dropped) and delete users — the last active admin can never
-  be demoted, frozen or deleted, and nobody can demote or freeze themselves;
+- three roles: `superadmin`, `admin` and `user`; admins get a **Users** page
+  where they can change roles, assign a new password to anybody (without
+  knowing the old one), freeze accounts (frozen users cannot sign in and
+  their active sessions are dropped) and delete users — except superadmins:
+  their accounts and the `superadmin` role itself are managed by superadmins
+  only;
+- the first admin account is the superadmin: the account created on the
+  first-run screen gets the role (so does the very first GitLab sign-in),
+  only superadmins can grant or revoke it, and existing databases upgrade
+  themselves — on start the oldest active admin becomes superadmin whenever
+  the role has no active holder;
+- lockout is impossible through the API: the last active superadmin can never
+  be demoted, frozen or deleted, the last active admin can neither (a
+  superadmin counts), and nobody can change their own role or freeze
+  themselves;
 - servers remember who added them: editing, deleting and toggling a server
   is allowed to its creator and to admins only (with auth off everybody
   may do everything, as before);
-- the interval and retention settings and the **System configuration** card
-  (edits `config.json`) on the Settings page are editable by admins only
-  (the password and appearance cards stay available to everyone);
+- the interval and retention settings on the Settings page are editable by
+  admins only, the **System configuration** card (edits `config.json`) by
+  superadmins only (the password and appearance cards stay available to
+  everyone);
+- **View as** (Settings): an admin can temporarily look at the whole UI as a
+  plain user, a superadmin also as an admin — for testing and for doing
+  risky things without admin powers. The mask applies to the current session
+  only, never adds rights, and the sidebar shows a banner with one-click
+  return while it is active;
 - sign out in the sidebar; the Settings page can change your own password
   (the current session stays signed in, others are signed out).
 
@@ -192,7 +208,7 @@ GitLab server on your LAN with OAuth2 (authorization code, scope
 
 - the login page gains a "Sign in with GitLab" button;
 - the first GitLab sign-in creates a local user with the same username and
-  the admin role (it can only happen while no users exist); later GitLab
+  the superadmin role (it can only happen while no users exist); later GitLab
   sign-ins are created as plain `user` accounts — an admin promotes them on
   the Users page; new GitLab users carry a "GitLab" badge, have no password
   and can set a local one in Settings (the card asks for a new password
@@ -346,11 +362,12 @@ update.sh|.bat  one-shot install/update: pull + install --omit=dev + build
 - `GET /api/range?serverId&metric&from&to` — metric history (raw/hourly/daily — the source is picked automatically)
 - `GET /api/heatmap?metric&period=1h|3h|12h|24h|7d|30d|1y` — servers × buckets matrix
 - `GET|PUT /api/settings` (`PUT`: admin only when auth is on)
-- `GET|PUT /api/config` — read and rewrite `config.json` (admin only when auth is on; everything except `db.path` applies immediately)
+- `GET|PUT /api/config` — read and rewrite `config.json` (superadmin only when auth is on; everything except `db.path` applies immediately)
 - `GET /api/update/status` — running commit and update availability; `POST /api/update/check` — re-check now; `POST /api/update/apply` — pull, rebuild and restart via `scripts/autoupdate.mjs` (admin only when auth is on; disabled in dev mode)
 - `/api/auth/status|setup|login|logout|password` — auth (public: status, setup, login, logout)
+- `POST /api/auth/view-as` — mask the current session as a lower role (`user`; superadmins also `admin`; `null` drops the mask)
 - `GET /api/auth/gitlab/start` — redirect to GitLab; `GET /api/auth/gitlab/callback` — the OAuth callback endpoint: register exactly this URL as the redirect URI in the GitLab application
-- `GET /api/users`, `PATCH|DELETE /api/users/:id` — user management (admins only; PATCH takes `role`, `disabled`, `password`)
+- `GET /api/users`, `PATCH|DELETE /api/users/:id` — user management (admins only; PATCH takes `role`, `disabled`, `password`; superadmin accounts and the `superadmin` role are managed by superadmins only)
 - `GET /api/gateway/status` — queue lanes and per-server gateway load (admin only when auth is on)
 - `GET|POST /api/gateway/clients`, `PATCH|DELETE /api/gateway/clients/:id`, `POST /api/gateway/clients/:id/rotate`, `GET /api/gateway/clients/:id/ips` — gateway API tokens (admins only when auth is on; POST/rotate return the raw token once; the view and POST/PATCH carry `serversAll`/`serverIds`)
 - `PUT /api/gateway/servers/:id/clients` — set which clients may route through that server (admin only when auth is on)

@@ -3,12 +3,28 @@
 const emit = defineEmits<{ dismiss: [] }>()
 
 const route = useRoute()
-const { status, isAdmin, signOut } = useAuth()
+const { status, isAdmin, signOut, isMasked, viewingAs, switchViewAs } = useAuth()
 const { connected } = useLive()
 const { status: updateStatus, checkNow, canApply, restarting, applyUpdate } = useUpdate()
 const authUser = computed(() => (status.value?.authEnabled ? status.value.user : null))
 const { t } = useI18n()
 const toast = useToast()
+
+// view-as masking: the banner is the escape hatch on every page, so it may
+// not depend on any admin check - dropping the mask is always allowed
+const viewAsLabel = computed(() => (viewingAs.value === 'admin' ? t('users.roleAdmin') : t('users.roleUser')))
+
+async function backToRealRole () {
+  try {
+    await switchViewAs(null)
+  } catch (err: unknown) {
+    toast.add({
+      title: t('settings.toastSaveFailed'),
+      description: (err as { statusMessage?: string })?.statusMessage ?? String(err),
+      color: 'error'
+    })
+  }
+}
 
 const versionLabel = computed(() => (updateStatus.value ? shortVersion(updateStatus.value.currentSha) : ''))
 const versionDate = computed(() => (updateStatus.value?.commitTs ? new Date(updateStatus.value.commitTs).toLocaleDateString() : ''))
@@ -81,6 +97,16 @@ function isActive (to: string) {
         {{ t(item.label) }}
       </NuxtLink>
     </nav>
+
+    <!-- the mask is temporary by design: show it above the footer with a
+         one-click way back to the real role -->
+    <div v-if="isMasked" class="mx-1 mb-1 px-2 py-1.5 rounded-md bg-elevated flex items-center gap-1.5">
+      <UIcon name="i-lucide-user-round-cog" class="size-3.5 shrink-0 text-warning" />
+      <span class="text-xs text-muted truncate flex-1">{{ t('footer.viewAs', { role: viewAsLabel }) }}</span>
+      <UButton size="xs" color="warning" variant="soft" class="shrink-0" @click="backToRealRole()">
+        {{ t('footer.viewAsBack') }}
+      </UButton>
+    </div>
 
     <!-- footer group: build info sits above the divider as plain text,
          the utility buttons (live state · theme · source · logout) below it -->

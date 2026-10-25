@@ -7,7 +7,8 @@ import {
   authorizeUrl, isGroupAllowed, newOAuthState, pathsFromGroupsResponse, tokenFromResponse, usernameFromUserResponse
 } from '../server/utils/gitlab.ts'
 import {
-  canManageServer, demotesActiveAdmin
+  canAssignRole, canEditAccount, canManageServer, canViewAs, demotesActiveAdmin, demotesActiveSuperadmin,
+  effectiveRole, roleRank
 } from '../server/utils/permissions.ts'
 
 let failed = 0
@@ -68,6 +69,7 @@ check('canManageServer: admin manages any server', canManageServer(true, { userI
 check('canManageServer: creator manages own server', canManageServer(true, { userId: 5, userRole: 'user' }, { created_by: 5 }))
 check('canManageServer: outsider user denied', !canManageServer(true, { userId: 5, userRole: 'user' }, { created_by: 6 }))
 check('canManageServer: unknown author is admin-only', !canManageServer(true, { userId: 5, userRole: 'user' }, { created_by: null }))
+check('canManageServer: superadmin manages any server', canManageServer(true, { userId: 1, userRole: 'superadmin' }, { created_by: 9 }))
 
 const activeAdmin = { role: 'admin', disabled: 0 }
 check('demotesActiveAdmin: demote counts', demotesActiveAdmin(activeAdmin, { role: 'user' }))
@@ -76,6 +78,38 @@ check('demotesActiveAdmin: delete treated as freeze', demotesActiveAdmin(activeA
 check('demotesActiveAdmin: rename/password does not demote', !demotesActiveAdmin(activeAdmin, {}))
 check('demotesActiveAdmin: plain user is fine', !demotesActiveAdmin({ role: 'user', disabled: 0 }, { disabled: true }))
 check('demotesActiveAdmin: already frozen admin is fine', !demotesActiveAdmin({ role: 'admin', disabled: 1 }, { role: 'user' }))
+check('demotesActiveAdmin: admin becoming superadmin stays in the pool', !demotesActiveAdmin(activeAdmin, { role: 'superadmin' }))
+
+const activeSuper = { role: 'superadmin', disabled: 0 }
+check('demotesActiveSuperadmin: demote to admin counts', demotesActiveSuperadmin(activeSuper, { role: 'admin' }))
+check('demotesActiveSuperadmin: demote to user counts', demotesActiveSuperadmin(activeSuper, { role: 'user' }))
+check('demotesActiveSuperadmin: freeze counts', demotesActiveSuperadmin(activeSuper, { disabled: true }))
+check('demotesActiveSuperadmin: password change does not demote', !demotesActiveSuperadmin(activeSuper, {}))
+check('demotesActiveSuperadmin: plain admin is fine', !demotesActiveSuperadmin(activeAdmin, { role: 'superadmin' }))
+check('demotesActiveSuperadmin: already frozen superadmin is fine', !demotesActiveSuperadmin({ role: 'superadmin', disabled: 1 }, { role: 'admin' }))
+
+check('roleRank: superadmin above admin above user', roleRank('superadmin') > roleRank('admin') && roleRank('admin') > roleRank('user') && roleRank('user') > roleRank(undefined))
+check('roleRank: unknown role ranks as plain user', roleRank('wizard') === roleRank('user'))
+
+check('effectiveRole: no mask means the real role', effectiveRole('superadmin', null) === 'superadmin')
+check('effectiveRole: mask lowers the role', effectiveRole('superadmin', 'user') === 'user' && effectiveRole('superadmin', 'admin') === 'admin')
+check('effectiveRole: mask cannot raise rights', effectiveRole('admin', 'superadmin') === 'admin' && effectiveRole('user', 'admin') === 'user')
+check('effectiveRole: bogus mask falls back to the real role', effectiveRole('admin', 'wizard') === 'admin')
+
+check('canViewAs: superadmin can hide as admin or user', canViewAs('superadmin', 'admin') && canViewAs('superadmin', 'user'))
+check('canViewAs: admin can hide as user only', canViewAs('admin', 'user') && !canViewAs('admin', 'admin') && !canViewAs('admin', 'superadmin'))
+check('canViewAs: dropping the mask is allowed for admins', canViewAs('superadmin', null) && canViewAs('admin', null))
+check('canViewAs: plain users cannot mask at all', !canViewAs('user', null) && !canViewAs('user', 'user'))
+check('canViewAs: signed out and unknown roles get nothing', !canViewAs(undefined, null) && !canViewAs('wizard', 'user'))
+
+check('canEditAccount: admins manage users and admins', canEditAccount('admin', 'user') && canEditAccount('admin', 'admin'))
+check('canEditAccount: superadmins are reserved to superadmins', !canEditAccount('admin', 'superadmin') && canEditAccount('superadmin', 'superadmin'))
+check('canEditAccount: masked superadmin is just an admin', !canEditAccount('admin', 'superadmin'))
+check('canEditAccount: plain users and unknown manage nothing', !canEditAccount('user', 'user') && !canEditAccount(undefined, 'user'))
+
+check('canAssignRole: only superadmins hand out the top role', canAssignRole('superadmin', 'superadmin') && !canAssignRole('admin', 'superadmin'))
+check('canAssignRole: admins keep assigning admin/user', canAssignRole('admin', 'admin') && canAssignRole('admin', 'user') && canAssignRole('superadmin', 'user'))
+check('canAssignRole: plain users assign nothing', !canAssignRole('user', 'user') && !canAssignRole(undefined, 'user'))
 
 console.log(failed === 0 ? '\nAll checks passed' : `\n${failed} checks FAILED`)
 process.exit(failed === 0 ? 0 : 1)

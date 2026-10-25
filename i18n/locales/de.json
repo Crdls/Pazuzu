@@ -9,7 +9,9 @@
     "menu": "Menü"
   },
   "footer": {
-    "source": "Quellcode"
+    "source": "Quellcode",
+    "viewAs": "Ansicht als: {role}",
+    "viewAsBack": "Zurück"
   },
   "common": {
     "addServer": "Server hinzufügen",
@@ -129,6 +131,10 @@
     "language": "Sprache",
     "languageAuto": "Automatisch (Browser)",
     "languageHelp": "Im Konto gespeichert; „Automatisch“ folgt der Browsersprache.",
+    "viewAsTitle": "Anzeigen als",
+    "viewAsHelp": "Pazuzu vorübergehend mit einer niedrigeren Rolle ansehen – praktisch zum Testen. Die echte Rolle bleibt unverändert; das Banner in der Seitenleiste bringt mit einem Klick zurück.",
+    "viewAs": "Ansichtsmodus",
+    "viewAsNormal": "Normal (eigene Rolle)",
     "colorMode": "Modus",
     "colorScheme": "Farbschema",
     "colorSchemeHelp": "Standard nutzt das eingebaute Theme; Eigene öffnet die Auswahl von Akzent- und neutraler Palette.",
@@ -245,6 +251,7 @@
     "addTitle": "Benutzer anlegen",
     "gitlab": "GitLab",
     "role": "Rolle",
+    "roleSuperadmin": "Superadmin",
     "roleAdmin": "Admin",
     "roleUser": "Benutzer",
     "status": "Status",

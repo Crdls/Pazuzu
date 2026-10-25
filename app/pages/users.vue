@@ -2,7 +2,7 @@
 interface UserRow {
   id: number
   username: string
-  role: 'admin' | 'user'
+  role: 'superadmin' | 'admin' | 'user'
   gitlab: number
   disabled: number
   created_at: number
@@ -15,21 +15,28 @@ const { data: users, refresh } = useFetch<UserRow[]>('/api/users', {
 })
 const toast = useToast()
 const { t } = useI18n()
-const { status } = useAuth()
+const { status, isSuperadmin } = useAuth()
 const meId = computed(() => status.value?.user?.id ?? null)
 
 function fmtTime (ts: number | null): string {
   return ts ? new Date(ts).toLocaleString() : '—'
 }
 
+function roleLabel (role: UserRow['role']): string {
+  return role === 'superadmin' ? t('users.roleSuperadmin') : role === 'admin' ? t('users.roleAdmin') : t('users.roleUser')
+}
+
 const formOpen = ref(false)
 const editing = ref<UserRow | null>(null)
-const form = reactive({ role: 'user' as 'admin' | 'user', disabled: false, password: '', confirm: '' })
+const form = reactive({ role: 'user' as 'superadmin' | 'admin' | 'user', disabled: false, password: '', confirm: '' })
 const saving = ref(false)
 const isSelf = computed(() => editing.value !== null && editing.value.id === meId.value)
 const pwdMismatch = computed(() => form.confirm.length > 0 && form.confirm !== form.password)
 // the API refuses self demote/freeze, so the controls go dark as well
+// superadmin rows are read-only for plain admins (the API enforces it too)
+const canEditRow = (user: UserRow): boolean => isSuperadmin.value || user.role !== 'superadmin'
 const roleItems = computed(() => [
+  ...(isSuperadmin.value ? [{ value: 'superadmin', label: t('users.roleSuperadmin') }] : []),
   { value: 'admin', label: t('users.roleAdmin') },
   { value: 'user', label: t('users.roleUser') }
 ])
@@ -69,7 +76,7 @@ async function save () {
 const route = useRoute()
 const router = useRouter()
 const addOpen = ref(false)
-const addForm = reactive({ username: '', password: '', confirm: '', role: 'user' as 'admin' | 'user' })
+const addForm = reactive({ username: '', password: '', confirm: '', role: 'user' as 'superadmin' | 'admin' | 'user' })
 const addSaving = ref(false)
 const addMismatch = computed(() => addForm.confirm.length > 0 && addForm.confirm !== addForm.password)
 
@@ -164,8 +171,8 @@ async function remove () {
               </UBadge>
             </td>
             <td class="py-2.5 pr-3">
-              <UBadge :color="user.role === 'admin' ? 'primary' : 'neutral'" variant="subtle" size="sm">
-                {{ user.role === 'admin' ? t('users.roleAdmin') : t('users.roleUser') }}
+              <UBadge :color="user.role === 'superadmin' ? 'warning' : user.role === 'admin' ? 'primary' : 'neutral'" variant="subtle" size="sm">
+                {{ roleLabel(user.role) }}
               </UBadge>
             </td>
             <td class="py-2.5 pr-3 text-center">
@@ -179,11 +186,11 @@ async function remove () {
             <td class="py-2.5 pr-3 text-muted whitespace-nowrap">{{ fmtTime(user.created_at) }}</td>
             <td class="py-2.5 pr-3 text-muted whitespace-nowrap">{{ fmtTime(user.last_login) }}</td>
             <td class="py-2.5 text-right whitespace-nowrap">
-              <UButton size="xs" color="neutral" variant="ghost" icon="i-lucide-pencil" @click="openEdit(user)">
+              <UButton v-if="canEditRow(user)" size="xs" color="neutral" variant="ghost" icon="i-lucide-pencil" @click="openEdit(user)">
                 {{ t('users.edit') }}
               </UButton>
               <UButton
-                v-if="user.id !== meId"
+                v-if="user.id !== meId && canEditRow(user)"
                 size="xs"
                 color="error"
                 variant="ghost"

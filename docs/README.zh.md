@@ -27,7 +27,7 @@
   tok/s、队列、显存 %、功耗、命中率等）。时间范围和指标会在浏览器中记住（cookie）。
 - **设置** — 轮询间隔和汇总间隔（默认 30 秒）、原始数据和小时聚合的保留深度，
   修改后立即生效；同页的「系统配置」卡片可直接在浏览器中编辑 `config.json`
-  （开启验证后仅管理员），保存即生效——只有数据库路径需要重启。
+  （开启验证后仅超级管理员），保存即生效——只有数据库路径需要重启。
 - **自更新** — 侧栏显示当前构建的提交，每 6 小时检查一次
   `origin`，侧栏底部的"更新并重启"按钮（设置中也有）一键拉取新代码、
   重新构建并重启服务器（开启验证后仅管理员）。
@@ -43,7 +43,7 @@
   新增语言 = 一个 JSON 文件 + `nuxt.config.ts` 中的一条配置。
 - **可选的身份验证** — 在 `config.json` 中开启 `auth.enabled`；
   账户存储在 SQLite 中，密码使用 scrypt 哈希，登录有效期 30 天并在使用时
-  自动续期，角色分为 `admin` 和 `user`。开启验证且尚无任何用户时，应用会打开创建首个管理员账户的界面。
+  自动续期，角色分为 `superadmin`、`admin` 和 `user`。开启验证且尚无任何用户时，应用会打开创建首个超级管理员账户的界面。
   也可以通过局域网内的 GitLab 服务器登录（OAuth2，见下文「身份验证」）。
 - **API 网关（可选）** — 一个 OpenAI 兼容端点（`/v1`）在所有引擎间负载均衡：
   按应用分配的 API 令牌（`msk_…`）、带 aging 的优先级队列、会话感知路由
@@ -111,24 +111,34 @@ NITRO_HOST=0.0.0.0 NITRO_PORT=3003 node .output/server/index.mjs
 
 该文件是可选的（不存在 = 默认值：`data/data.db`，验证关闭）。
 `auth.enabled` 在文件修改后立即生效；`db.path` 在启动时生效，修改后需重启
-（相对路径相对于项目根目录解析）。管理员也可以在设置页面的「系统配置」
+（相对路径相对于项目根目录解析）。超级管理员也可以在设置页面的「系统配置」
 卡片中编辑这些设置：保存会就地重写 `config.json`（手工添加的其他键会保留），
 值立即生效 — 只有 `db.path` 需要重启。验证关闭时，该卡片像整个应用一样
 对网络中的所有设备开放。
 
 开启验证后：
 
-- 尚无任何用户 → 应用打开创建首个管理员账户的界面；
+- 尚无任何用户 → 应用打开创建首个超级管理员账户的界面；
 - 所有 API 请求和 WebSocket 都需要 `pazuzu_session` cookie
   （HttpOnly，密码为 SQLite 中的 scrypt 哈希，会话有效期 30 天并在使用时续期）；
-- 两种角色：`admin` 和 `user`；管理员可见「用户」页面，可在其中更换角色、
-  为任何用户指派新密码（无需知道旧密码）、冻结账户（被冻结者无法登录，
-  其活动会话立即失效）以及删除用户 — 最后一名活跃管理员不能被降级、冻结
-  或删除，任何人都不能降级或冻结自己；
+- 三种角色：`superadmin`、`admin` 和 `user`；管理员可见「用户」页面，可在其中
+  更换角色、为任何用户指派新密码（无需知道旧密码）、冻结账户（被冻结者无法
+  登录，其活动会话立即失效）以及删除用户 — 但超级管理员除外：他们的账户和
+  `superadmin` 角色本身只有超级管理员可以管理；
+- 第一个管理员账户就是超级管理员：首启界面创建的账户直接获得该角色
+  （首次 GitLab 登录也是如此），只有超级管理员能授予或撤销该角色；
+  已有数据库会自动升级 — 启动时若该角色没有活跃持有者，最早注册的活跃
+  管理员会成为超级管理员；
+- 通过 API 无法把自己锁死：最后一名活跃超级管理员不能被降级、冻结或删除，
+  最后一名活跃管理员同样不能（超级管理员也计入），任何人都不能修改自己的
+  角色或冻结自己；
 - 服务器会记住创建者：只有创建者和管理员可以编辑、删除和启停服务器
   （验证关闭时所有人照旧可操作）；
-- 设置页面中的轮询间隔、数据保留和「系统配置」卡片（编辑 `config.json`）
-  仅管理员可用（修改密码和外观卡片所有人可用）；
+- 设置页面中的轮询间隔和数据保留仅管理员可用，「系统配置」卡片
+  （编辑 `config.json`）仅超级管理员可用（修改密码和外观卡片所有人可用）；
+- 「角色预览」（设置页面）：管理员可临时以普通用户身份查看整个界面，
+  超级管理员还可以以管理员身份查看 — 便于测试，也便于放心尝试危险操作。
+  伪装只对当前会话生效、绝不会增加权限，生效期间侧栏显示横幅，一键即可返回；
 - 侧栏可退出登录；在设置页面可修改自己的密码
   （当前会话保持登录，其他会话将被退出）。
 
@@ -162,7 +172,7 @@ NITRO_HOST=0.0.0.0 NITRO_PORT=3003 node .output/server/index.mjs
 ```
 
 - 登录页会出现「使用 GitLab 登录」按钮；
-- 首次通过 GitLab 登录时创建同名本地用户并赋予管理员角色（仅在所有用户
+- 首次通过 GitLab 登录时创建同名本地用户并赋予超级管理员角色（仅在所有用户
   尚不存在时可能发生）；之后的 GitLab 登录创建普通 `user` 账户 — 由管理员
   在「用户」页面为其提权；新的 GitLab 用户带有「GitLab」徽标，没有密码，
   可在设置页面设置本地密码（此时表单只要求新密码，不要求当前密码），以便在
@@ -295,11 +305,12 @@ update.sh|.bat  一键安装/更新：pull + install --omit=dev + build
 - `GET /api/range?serverId&metric&from&to` — 指标历史（raw/hourly/daily — 数据源自动选择）
 - `GET /api/heatmap?metric&period=1h|3h|12h|24h|7d|30d|1y` — 服务器 × 时间桶矩阵
 - `GET|PUT /api/settings`（`PUT`：开启验证后仅管理员）
-- `GET|PUT /api/config` — 读取并重写 `config.json`（开启验证后仅管理员；除 `db.path` 外全部立即生效）
+- `GET|PUT /api/config` — 读取并重写 `config.json`（开启验证后仅超级管理员；除 `db.path` 外全部立即生效）
 - `GET /api/update/status` — 当前提交与更新可用性；`POST /api/update/check` — 立即重新检查；`POST /api/update/apply` — 通过 `scripts/autoupdate.mjs` 拉取、构建并重启（开启验证后仅管理员；开发模式下禁用）
 - `/api/auth/status|setup|login|logout|password` — 身份验证（公开：status、setup、login、logout）
+- `POST /api/auth/view-as` — 将当前会话伪装为更低角色（`user`；超级管理员还可 `admin`；`null` 取消伪装）
 - `GET /api/auth/gitlab/start` — 重定向到 GitLab；`GET /api/auth/gitlab/callback` — OAuth callback：请把这一 URL 原样注册为 GitLab 应用的 redirect URI
-- `GET /api/users`、`PATCH|DELETE /api/users/:id` — 用户管理（仅管理员；PATCH 接受 `role`、`disabled`、`password`）
+- `GET /api/users`、`PATCH|DELETE /api/users/:id` — 用户管理（仅管理员；PATCH 接受 `role`、`disabled`、`password`；超级管理员账户与 `superadmin` 角色仅超级管理员可管理）
 - `GET /api/gateway/status` — 队列通道与各服务器的网关负载（开启验证后仅管理员）
 - `GET|POST /api/gateway/clients`、`PATCH|DELETE /api/gateway/clients/:id`、`POST /api/gateway/clients/:id/rotate`、`GET /api/gateway/clients/:id/ips` — 网关 API 令牌（开启验证后仅管理员；POST/rotate 只返回一次原始令牌；视图和 POST/PATCH 带有 `serversAll`/`serverIds` 字段）
 - `PUT /api/gateway/servers/:id/clients` — 设置哪些客户可以使用该服务器（开启验证后仅管理员）

@@ -12,7 +12,8 @@ export default defineEventHandler(async (event) => {
   if (!username) throw createError({ statusCode: 400, statusMessage: 'username must be 1-64 characters' })
   if (!isPasswordValid(body?.password)) throw createError({ statusCode: 400, statusMessage: 'password must be 8-1024 characters' })
   if (getUserByUsername(username)) throw createError({ statusCode: 409, statusMessage: 'Setup already completed' })
-  const user = createUser(username, await hashPassword(body.password), 'admin', false)
+  // the first account owns the top role: it is the only one that can hand it out
+  const user = createUser(username, await hashPassword(body.password), 'superadmin', false)
   startSession(event, user.id)
-  return authStatus(event, { id: user.id, username: user.username, role: user.role, hasPassword: true, lang: null })
+  return authStatus(event, { id: user.id, username: user.username, role: user.role, realRole: user.role, hasPassword: true, lang: null })
 })

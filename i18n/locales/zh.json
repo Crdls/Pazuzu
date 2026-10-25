@@ -9,7 +9,9 @@
     "menu": "菜单"
   },
   "footer": {
-    "source": "源代码"
+    "source": "源代码",
+    "viewAs": "当前以{role}身份查看",
+    "viewAsBack": "返回"
   },
   "common": {
     "addServer": "添加服务器",
@@ -129,6 +131,10 @@
     "language": "语言",
     "languageAuto": "自动（跟随浏览器）",
     "languageHelp": "保存在账户中；自动即跟随浏览器语言。",
+    "viewAsTitle": "角色预览",
+    "viewAsHelp": "暂时以较低角色查看 Pazuzu,方便测试。真实角色不变,侧栏横幅一键即可返回。",
+    "viewAs": "预览模式",
+    "viewAsNormal": "正常(自身角色)",
     "colorMode": "模式",
     "colorScheme": "配色方案",
     "colorSchemeHelp": "“标准”使用内置主题；“自定义”可自由选择强调色与中性色板。",
@@ -245,6 +251,7 @@
     "addTitle": "新建用户",
     "gitlab": "GitLab",
     "role": "角色",
+    "roleSuperadmin": "超级管理员",
     "roleAdmin": "管理员",
     "roleUser": "普通用户",
     "status": "状态",

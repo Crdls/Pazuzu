@@ -9,7 +9,9 @@
     "menu": "Menu"
   },
   "footer": {
-    "source": "Source code"
+    "source": "Source code",
+    "viewAs": "Viewing as: {role}",
+    "viewAsBack": "Return"
   },
   "common": {
     "addServer": "Add server",
@@ -129,6 +131,10 @@
     "language": "Language",
     "languageAuto": "Auto (browser)",
     "languageHelp": "Stored on your account; auto follows the browser language.",
+    "viewAsTitle": "View as",
+    "viewAsHelp": "Temporarily look at Pazuzu through a lower role — handy for testing. The real role stays untouched; the sidebar banner returns with one click.",
+    "viewAs": "View mode",
+    "viewAsNormal": "Normal (own role)",
     "colorMode": "Mode",
     "colorScheme": "Color scheme",
     "colorSchemeHelp": "Standard uses the built-in theme; Custom lets you pick the accent and neutral palettes.",
@@ -245,6 +251,7 @@
     "addTitle": "Add a user",
     "gitlab": "GitLab",
     "role": "Role",
+    "roleSuperadmin": "Superadmin",
     "roleAdmin": "Admin",
     "roleUser": "User",
     "status": "Status",

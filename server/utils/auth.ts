@@ -3,10 +3,10 @@ import {
 } from './credentials'
 import {
   countUsers, createSession, deleteSession, deleteUserSessions, extendSession,
-  getSessionUser, purgeExpiredSessions
+  getSessionUser, purgeExpiredSessions, type UserRole
 } from './db'
 import { loadConfig, isGitlabReady } from './config'
-import { canManageServer, type Actor } from './permissions'
+import { canManageServer, effectiveRole, roleRank, type Actor } from './permissions'
 import { runtime } from './runtime'
 
 // re-export the primitives so auth consumers do not need two imports
@@ -15,7 +15,10 @@ export { SESSION_COOKIE, SESSION_TTL_MS, hashPassword, hashToken, cookieValue, v
 export interface AuthUser {
   id: number
   username: string
-  role: 'admin' | 'user'
+  /** effective role — the view-as mask applied, so gates see what the user sees */
+  role: UserRole
+  /** actual role from the users table, untouched by masking */
+  realRole: UserRole
   /** false for GitLab-created users who have not set a local password yet */
   hasPassword: boolean
   /** UI language saved on the account; null = browser detection */
@@ -49,16 +52,30 @@ export function verifySessionToken (token: string | null | undefined): VerifiedS
   // opportunistic cleanup, cheap enough to run sporadically
   if (Math.random() < 0.02) purgeExpiredSessions(now)
   return {
-    user: { id: row.user_id, username: row.username, role: row.role, hasPassword: row.pass_hash !== '', lang: row.lang ?? null },
+    user: {
+      id: row.user_id,
+      username: row.username,
+      role: effectiveRole(row.role, row.view_as) as UserRole,
+      realRole: row.role,
+      hasPassword: row.pass_hash !== '',
+      lang: row.lang ?? null
+    },
     tokenHash,
     refreshed
   }
 }
 
-/** Gate for admin-only API routes; runs after the auth middleware filled the context. */
+/** Gate for admin-only API routes; superadmins pass too. */
 export function requireAdmin (event: NitroEvent): void {
-  if (event.context.userRole !== 'admin') {
+  if (roleRank(event.context.userRole) < roleRank('admin')) {
     throw createError({ statusCode: 403, statusMessage: 'Admin access required' })
+  }
+}
+
+/** Gate for superadmin-only API routes (config.json and future hidden settings). */
+export function requireSuperadmin (event: NitroEvent): void {
+  if (event.context.userRole !== 'superadmin') {
+    throw createError({ statusCode: 403, statusMessage: 'Superuser access required' })
   }
 }
 

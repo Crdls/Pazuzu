@@ -21,14 +21,13 @@ const { data: servers, refresh } = useFetch<ServerRow[]>('/api/servers', {
 })
 const toast = useToast()
 const { t } = useI18n()
-const { status } = useAuth()
+const { status, isAdmin } = useAuth()
 
 // only the creator or an admin may change a server (the API enforces it too)
 function canManage (server: ServerRow): boolean {
   if (!status.value?.authEnabled) return true
-  const user = status.value.user
-  if (user?.role === 'admin') return true
-  return server.createdBy != null && server.createdBy === user?.id
+  if (isAdmin.value) return true
+  return server.createdBy != null && server.createdBy === status.value.user?.id
 }
 
 // ---------- client access selection (admins only: the client list is admin data) ----------
@@ -39,7 +38,7 @@ interface ClientOption {
   serverIds: number[]
 }
 
-const canPickClients = computed(() => !status.value?.authEnabled || status.value?.user?.role === 'admin')
+const canPickClients = computed(() => !status.value?.authEnabled || isAdmin.value)
 const clientOptions = ref<ClientOption[]>([])
 const clientSel = ref<number[]>([])
 

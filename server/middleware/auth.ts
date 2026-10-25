@@ -21,7 +21,9 @@ export default defineEventHandler((event) => {
     if (session.refreshed && token) setSessionCookie(event, token)
     event.context.userId = session.user.id
     event.context.username = session.user.username
+    // effective role (view-as mask applied) — every gate below reads this one
     event.context.userRole = session.user.role
+    event.context.userRealRole = session.user.realRole
     event.context.sessionTokenHash = session.tokenHash
   }
   if (!OPEN_AUTH_PATHS.has(path) && !session) {

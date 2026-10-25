@@ -15,7 +15,7 @@ const { data, refresh } = useFetch<Settings>('/api/settings', {
 })
 const toast = useToast()
 const { t, setLocale } = useI18n()
-const { status, isAdmin } = useAuth()
+const { status, isAdmin, isSuperadmin, realIsAdmin, isMasked, switchViewAs } = useAuth()
 
 const authed = computed(() => Boolean(status.value?.authEnabled && status.value?.user))
 // background intervals are an admin concern while auth is on
@@ -47,7 +47,7 @@ async function save () {
   }
 }
 
-// config.json (system configuration): admin-only card, values apply on save
+// config.json (system configuration): superadmin-only card, values apply on save
 interface ConfigFile {
   path: string
   exists: boolean
@@ -78,9 +78,9 @@ interface ConfigFile {
   }
 }
 
-const canEditConfig = computed(() => !status.value?.authEnabled || isAdmin.value)
-// lazy: admins (or anyone while auth is off) pull the file client-side, so
-// non-admin users never fire a request that would only 403
+const canEditConfig = computed(() => !status.value?.authEnabled || isSuperadmin.value)
+// lazy: superadmins (or anyone while auth is off) pull the file client-side,
+// so lower roles never fire a request that would only 403
 const { data: cfgFile, refresh: refreshCfg } = useFetch<ConfigFile>('/api/config', { immediate: false })
 if (canEditConfig.value) refreshCfg()
 
@@ -143,6 +143,38 @@ async function saveCfg () {
     })
   } finally {
     cfgSaving.value = false
+  }
+}
+
+// view-as masking (per session): admins rehearse as plain users, superadmins
+// as admins or users; gated on the real role so a masked admin can always
+// come back, and the choice only ever lowers what the session can do
+const canChooseViewAs = computed(() =>
+  Boolean(status.value?.authEnabled && status.value?.user) && (realIsAdmin.value || isMasked.value))
+const viewAsChoice = ref<string>('self')
+watch(status, (s) => {
+  if (s?.user) viewAsChoice.value = s.user.role === s.user.realRole ? 'self' : s.user.role
+}, { immediate: true })
+const viewAsItems = computed(() => {
+  const items: Array<{ value: string, label: string }> = [{ value: 'self', label: t('settings.viewAsNormal') }]
+  if (status.value?.user?.realRole === 'superadmin') items.push({ value: 'admin', label: t('users.roleAdmin') })
+  items.push({ value: 'user', label: t('users.roleUser') })
+  return items
+})
+
+async function applyViewAs (value: string | number | null) {
+  if (value === viewAsChoice.value) return
+  const prev = viewAsChoice.value
+  viewAsChoice.value = String(value)
+  try {
+    await switchViewAs(value === 'self' ? null : value as 'admin' | 'user')
+  } catch (err: unknown) {
+    viewAsChoice.value = prev
+    toast.add({
+      title: t('settings.toastSaveFailed'),
+      description: (err as { statusMessage?: string })?.statusMessage ?? String(err),
+      color: 'error'
+    })
   }
 }
 
@@ -461,6 +493,14 @@ async function checkUpdate () {
           </UButton>
         </div>
       </form>
+    </UCard>
+
+    <UCard v-if="canChooseViewAs" variant="soft" class="mt-6 bg-elevated/30">
+      <h2 class="text-base font-semibold mb-1">{{ t('settings.viewAsTitle') }}</h2>
+      <p class="text-sm text-muted mb-4">{{ t('settings.viewAsHelp') }}</p>
+      <UFormField :label="t('settings.viewAs')">
+        <USelect :model-value="viewAsChoice" :items="viewAsItems" class="w-56" :aria-label="t('settings.viewAs')" @update:model-value="applyViewAs" />
+      </UFormField>
     </UCard>
 
     <UCard v-if="authed" variant="soft" class="mt-6 bg-elevated/30">

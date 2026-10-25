@@ -22,5 +22,5 @@ export default defineEventHandler(async (event) => {
   clearLoginFailures(ip)
   touchLastLogin(user.id)
   startSession(event, user.id)
-  return authStatus(event, { id: user.id, username: user.username, role: user.role, hasPassword: true, lang: user.lang ?? null })
+  return authStatus(event, { id: user.id, username: user.username, role: user.role, realRole: user.role, hasPassword: true, lang: user.lang ?? null })
 })

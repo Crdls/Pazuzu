@@ -4,7 +4,7 @@ import { dirname, resolve } from 'node:path'
 import { loadConfig } from './config.ts'
 import type { ClientPriority, GatewayMode } from './gateway/types.ts'
 
-export type UserRole = 'admin' | 'user'
+export type UserRole = 'superadmin' | 'admin' | 'user'
 
 export interface ServerRow {
   id: number
@@ -43,6 +43,8 @@ export interface SessionUserRow {
   expires_at: number
   username: string
   role: UserRole
+  /** view-as mask for this session only; null = acting as the real role */
+  view_as: string | null
   pass_hash: string
   disabled: number
   lang: string | null
@@ -216,8 +218,15 @@ export function useDb (): Database.Database {
     ensureColumn(db, 'servers', 'gateway_capacity', 'INTEGER')
     ensureColumn(db, 'users', 'lang', 'TEXT')
     ensureColumn(db, 'gateway_clients', 'servers_all', 'INTEGER NOT NULL DEFAULT 1')
+    ensureColumn(db, 'sessions', 'view_as', 'TEXT')
     // an empty pass_hash could only ever come from the GitLab OAuth sign-up
     db.prepare("UPDATE users SET gitlab = 1 WHERE pass_hash = '' AND gitlab = 0").run()
+    // superadmin bootstrap (also self-healing): the first admin owns the top
+    // role — whenever no active superadmin exists, the oldest active admin
+    // becomes one (no-op once a superadmin is in place)
+    db.prepare(`UPDATE users SET role = 'superadmin'
+                WHERE NOT EXISTS (SELECT 1 FROM users WHERE role = 'superadmin' AND disabled = 0)
+                  AND id = (SELECT MIN(id) FROM users WHERE role = 'admin' AND disabled = 0)`).run()
   }
   return db
 }
@@ -290,10 +299,17 @@ export function deleteUser (userId: number): void {
   useDb().prepare('DELETE FROM users WHERE id = ?').run(userId)
 }
 
-/** Admins who can still sign in - there must always be at least one. */
+/** Admins and superadmins who can still sign in - there must always be at least one. */
 export function countActiveAdmins (): number {
   return (useDb()
-    .prepare("SELECT COUNT(*) AS n FROM users WHERE role = 'admin' AND disabled = 0")
+    .prepare("SELECT COUNT(*) AS n FROM users WHERE role IN ('admin', 'superadmin') AND disabled = 0")
+    .get() as { n: number }).n
+}
+
+/** Superadmins who can still sign in - the only ones who can grant the top role. */
+export function countActiveSuperadmins (): number {
+  return (useDb()
+    .prepare("SELECT COUNT(*) AS n FROM users WHERE role = 'superadmin' AND disabled = 0")
     .get() as { n: number }).n
 }
 
@@ -320,10 +336,15 @@ export function createSession (tokenHash: string, userId: number, expiresAt: num
 
 export function getSessionUser (tokenHash: string): SessionUserRow | null {
   return useDb()
-    .prepare(`SELECT s.token_hash, s.user_id, s.expires_at, u.username, u.role, u.pass_hash, u.disabled, u.lang
+    .prepare(`SELECT s.token_hash, s.user_id, s.expires_at, s.view_as, u.username, u.role, u.pass_hash, u.disabled, u.lang
               FROM sessions s JOIN users u ON u.id = s.user_id
               WHERE s.token_hash = ?`)
     .get(tokenHash) as SessionUserRow | null
+}
+
+/** Set (or clear with null) the view-as mask of one session. */
+export function setSessionViewAs (tokenHash: string, viewAs: string | null): void {
+  useDb().prepare('UPDATE sessions SET view_as = ? WHERE token_hash = ?').run(viewAs, tokenHash)
 }
 
 export function extendSession (tokenHash: string, expiresAt: number): void {
