@@ -345,7 +345,7 @@
     "debug": "En-têtes de débogage",
     "debugHelp": "Ajoute des en-têtes X-Pazuzu-* (serveur, attente, session) aux réponses de ce client.",
     "customToken": "Jeton perso (facultatif)",
-    "customTokenHelp": "Laisse vide pour générer un jeton msk_… Colle le tien pour le figer.",
+    "customTokenHelp": "Laisse vide pour générer un jeton pzz_… Colle le tien pour le figer.",
     "status": "Statut",
     "active": "actif",
     "disabled": "désactivé",

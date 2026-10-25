@@ -13,14 +13,14 @@ function check (name, cond) {
 }
 
 // ---------- tokens ----------
-check('generated token has the msk_ prefix', generateClientToken().startsWith(TOKEN_PREFIX))
+check('generated token has the pzz_ prefix', generateClientToken().startsWith(TOKEN_PREFIX))
 check('generated tokens are unique', generateClientToken() !== generateClientToken())
-check('token hint is short and keeps head+tail', tokenHint('msk_0123456789abcdef00').startsWith('msk_0123') && tokenHint('msk_0123456789abcdef00').endsWith('f00'))
+check('token hint is short and keeps head+tail', tokenHint('pzz_0123456789abcdef00').startsWith('pzz_0123') && tokenHint('pzz_0123456789abcdef00').endsWith('f00'))
 check('custom token must be long enough', normalizeCustomToken('short') === null)
 check('custom token rejects spaces', normalizeCustomToken('has space inside it') === null)
 check('custom token trims', normalizeCustomToken('  secret-token-value-1  ') === 'secret-token-value-1')
-check('bearerFrom parses Bearer header', bearerFrom('Bearer msk_abc') === 'msk_abc')
-check('bearerFrom is case-insensitive', bearerFrom('bearer msk_abc') === 'msk_abc')
+check('bearerFrom parses Bearer header', bearerFrom('Bearer pzz_abc') === 'pzz_abc')
+check('bearerFrom is case-insensitive', bearerFrom('bearer pzz_abc') === 'pzz_abc')
 check('bearerFrom rejects other schemes', bearerFrom('Basic abc') === null)
 
 // ---------- session keys ----------

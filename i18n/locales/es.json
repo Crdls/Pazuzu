@@ -345,7 +345,7 @@
     "debug": "Cabeceras de depuración",
     "debugHelp": "Añade cabeceras X-Pazuzu-* (servidor, espera en cola, sesión) a las respuestas de este cliente.",
     "customToken": "Token propio (opcional)",
-    "customTokenHelp": "Déjalo vacío para generar un token msk_… Pega el tuyo para fijarlo.",
+    "customTokenHelp": "Déjalo vacío para generar un token pzz_… Pega el tuyo para fijarlo.",
     "status": "Estado",
     "active": "activo",
     "disabled": "desactivado",

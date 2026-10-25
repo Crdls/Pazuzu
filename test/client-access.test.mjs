@@ -26,7 +26,7 @@ const addServer = (name) => Number(db
   .prepare('INSERT INTO servers (name, url, created_at) VALUES (?, ?, ?)')
   .run(name, `http://${name}.test/`, Date.now()).lastInsertRowid)
 const addClient = (name) => createGatewayClient({
-  name, tokenHash: `hash-${name}`, tokenHint: 'msk_xxx', priority: 'normal', debug: false, createdBy: null
+  name, tokenHash: `hash-${name}`, tokenHint: 'pzz_xxx', priority: 'normal', debug: false, createdBy: null
 })
 
 const s1 = addServer('s1')

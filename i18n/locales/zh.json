@@ -345,7 +345,7 @@
     "debug": "调试请求头",
     "debugHelp": "为该客户端的响应添加 X-Pazuzu-* 请求头（服务器、排队等待、会话）。",
     "customToken": "自定义令牌（可选）",
-    "customTokenHelp": "留空则生成 msk_… 令牌。粘贴你自己的令牌以固定它。",
+    "customTokenHelp": "留空则生成 pzz_… 令牌。粘贴你自己的令牌以固定它。",
     "status": "状态",
     "active": "启用",
     "disabled": "已禁用",

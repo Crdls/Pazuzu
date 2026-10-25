@@ -59,7 +59,7 @@ that load-balances application calls across all your engines.
   Users can also sign in through a GitLab server on the LAN (OAuth2, see
   [Authentication](#authentication)).
 - **API gateway (optional)** — one OpenAI-compatible endpoint (`/v1`) that
-  load-balances across all your engines: per-app API tokens (`msk_…`),
+  load-balances across all your engines: per-app API tokens (`pzz_…`),
   a priority queue with aging, session-aware routing (a chat keeps hitting
   the engine that holds its KV prefix cache), per-server routing modes
   (route / drain / stats-only), per-client engine preference (own machines
@@ -246,7 +246,7 @@ engines — one OpenAI-compatible endpoint in front of all of them:
 
 ```
 POST http://<pazuzu-host>:3003/v1/chat/completions
-Authorization: Bearer msk_…
+Authorization: Bearer pzz_…
 ```
 
 Everything under `/v1` is forwarded transparently (chat completions, models,
@@ -260,7 +260,7 @@ in `config.json`:
 or on the Settings page, in the **System configuration** card.
 
 - **Clients** — the **Clients** page (admins only when auth is on) manages
-  the API tokens that may call the gateway: an auto-generated `msk_…` key
+  the API tokens that may call the gateway: an auto-generated `pzz_…` key
   (shown exactly once, only its hash is stored) or your own token. Tokens
   can be disabled and rotated, carry a priority, and every client gets
   request counters and a source-IP history.
@@ -381,7 +381,7 @@ update.sh|.bat  one-shot install/update: pull + install --omit=dev + build
 - `GET /api/gateway/status` — queue lanes and per-server gateway load (admin only when auth is on)
 - `GET|POST /api/gateway/clients`, `PATCH|DELETE /api/gateway/clients/:id`, `POST /api/gateway/clients/:id/rotate`, `GET /api/gateway/clients/:id/ips` — gateway API tokens (admins only when auth is on; POST/rotate return the raw token once; the view and POST/PATCH carry `serversAll`/`serverIds` and `serverPriorities` — a `{serverId: "high"|"normal"|"low"}` map of engine preference)
 - `PUT /api/gateway/servers/:id/clients` — set which clients may route through that server (admin only when auth is on)
-- `/v1/**` — OpenAI-compatible gateway, authenticated by client tokens (`Authorization: Bearer msk_…`), not by the session cookie — see [Gateway](#gateway-load-balancer)
+- `/v1/**` — OpenAI-compatible gateway, authenticated by client tokens (`Authorization: Bearer pzz_…`), not by the session cookie — see [Gateway](#gateway-load-balancer)
 - `WS /_ws` — push snapshots
 
 ## Tests
@@ -413,7 +413,7 @@ node test/update.test.mjs
   and `/_ws` require a valid session cookie.
 - The `/v1` gateway is off by default too, and it is deliberately *not*
   gated by the session cookie — clients authenticate with their own
-  `msk_…` API tokens there.
+  `pzz_…` API tokens there.
 
 ## Acknowledgments
 

@@ -477,7 +477,7 @@ function priorityColor (p: string): 'error' | 'primary' | 'neutral' {
             <USwitch v-model="addForm.debug" size="sm" />
           </UFormField>
           <UFormField :label="t('clients.customToken')" :help="t('clients.customTokenHelp')">
-            <UInput v-model="addForm.token" type="text" autocomplete="off" placeholder="msk_…" class="w-full font-mono text-xs" />
+            <UInput v-model="addForm.token" type="text" autocomplete="off" placeholder="pzz_…" class="w-full font-mono text-xs" />
           </UFormField>
           <div class="flex justify-end gap-2 pt-2">
             <UButton color="neutral" variant="ghost" @click="addOpen = false">

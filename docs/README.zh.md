@@ -46,7 +46,7 @@
   自动续期，角色分为 `superadmin`、`admin` 和 `user`。开启验证且尚无任何用户时，应用会打开创建首个超级管理员账户的界面。
   也可以通过局域网内的 GitLab 服务器登录（OAuth2，见下文「身份验证」）。
 - **API 网关（可选）** — 一个 OpenAI 兼容端点（`/v1`）在所有引擎间负载均衡：
-  按应用分配的 API 令牌（`msk_…`）、带 aging 的优先级队列、会话感知路由
+  按应用分配的 API 令牌（`pzz_…`）、带 aging 的优先级队列、会话感知路由
   （同一会话始终落在持有其 KV 前缀缓存的引擎上）、按服务器的网关模式
   （路由 / 排空 / 仅统计）、按客户端的引擎偏好（本机硬件优先）以及来源 IP 记录；「客户端」页面同时也是网关控制台——
   实时队列与各引擎负载一览。默认关闭，在 `config.json` 或设置中开启
@@ -205,7 +205,7 @@ OpenAI 兼容端点：
 
 ```
 POST http://<pazuzu-主机>:3003/v1/chat/completions
-Authorization: Bearer msk_…
+Authorization: Bearer pzz_…
 ```
 
 发往 `/v1` 的一切都会被透明转发（chat completions、models 及其他兼容路由），
@@ -218,7 +218,7 @@ Authorization: Bearer msk_…
 或在设置页面的「系统配置」卡片中开启。
 
 - **客户端** — 「客户端」页面（开启验证后仅管理员）管理允许调用网关的
-  API 令牌：自动生成 `msk_…` 密钥（只显示一次，仅存储其哈希）或使用自定义
+  API 令牌：自动生成 `pzz_…` 密钥（只显示一次，仅存储其哈希）或使用自定义
   令牌；令牌可停用、轮换，带有优先级，每个客户端都有请求计数、来源 IP 记录
   和对引擎的偏好设置。
 - **客户端的服务器访问权限** — 可以限制每个客户端可用的引擎集合：在「客户端」
@@ -322,7 +322,7 @@ update.sh|.bat  一键安装/更新：pull + install --omit=dev + build
 - `GET /api/gateway/status` — 队列通道与各服务器的网关负载（开启验证后仅管理员）
 - `GET|POST /api/gateway/clients`、`PATCH|DELETE /api/gateway/clients/:id`、`POST /api/gateway/clients/:id/rotate`、`GET /api/gateway/clients/:id/ips` — 网关 API 令牌（开启验证后仅管理员；POST/rotate 只返回一次原始令牌；视图和 POST/PATCH 带有 `serversAll`/`serverIds` 以及 `serverPriorities`——形如 `{serverId: "high"|"normal"|"low"}` 的引擎偏好映射）
 - `PUT /api/gateway/servers/:id/clients` — 设置哪些客户可以使用该服务器（开启验证后仅管理员）
-- `/v1/**` — OpenAI 兼容网关，用客户端自己的令牌认证（`Authorization: Bearer msk_…`），不用会话 cookie — 见上文「网关（负载均衡器）」
+- `/v1/**` — OpenAI 兼容网关，用客户端自己的令牌认证（`Authorization: Bearer pzz_…`），不用会话 cookie — 见上文「网关（负载均衡器）」
 - `WS /_ws` — 推送快照
 
 ## 测试
@@ -351,7 +351,7 @@ node test/update.test.mjs
 - 身份验证默认关闭（本服务面向受信任的本地网络）；开启后，除认证引导接口外，
   所有 `/api` 和 `/_ws` 都需要有效的会话 cookie。
 - `/v1` 网关默认同样关闭，并且有意*不*用会话 cookie 把关——客户端在那里
-  用自己的 `msk_…` API 令牌认证。
+  用自己的 `pzz_…` API 令牌认证。
 
 ## 致谢
 

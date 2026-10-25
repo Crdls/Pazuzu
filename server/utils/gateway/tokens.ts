@@ -7,9 +7,9 @@ import { randomBytes } from 'node:crypto'
  * (node:crypto only) so it is reachable from bare Node tests.
  */
 
-export const TOKEN_PREFIX = 'msk_'
+export const TOKEN_PREFIX = 'pzz_'
 
-/** `msk_` + 32 hex chars (~128 bits of entropy). */
+/** `pzz_` + 32 hex chars (~128 bits of entropy). */
 export function generateClientToken (): string {
   return TOKEN_PREFIX + randomBytes(16).toString('hex')
 }

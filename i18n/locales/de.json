@@ -345,7 +345,7 @@
     "debug": "Debug-Header",
     "debugHelp": "Fügt den Antworten dieses Clients X-Pazuzu-* Header (Server, Warteschlangenzeit, Sitzung) hinzu.",
     "customToken": "Eigenes Token (optional)",
-    "customTokenHelp": "Leer lassen, um ein msk_…-Token zu erzeugen. Eigenes einfügen, um es zu fixieren.",
+    "customTokenHelp": "Leer lassen, um ein pzz_…-Token zu erzeugen. Eigenes einfügen, um es zu fixieren.",
     "status": "Status",
     "active": "aktiv",
     "disabled": "deaktiviert",

@@ -15,7 +15,7 @@ import {
 
 /**
  * /v1/** — the load-balancing gateway. Clients hit Pazuzu with their
- * `msk_` bearer token; the request is admitted by the priority waiting room,
+ * `pzz_` bearer token; the request is admitted by the priority waiting room,
  * routed by chat affinity → least-loaded engine, and streamed straight back.
  * Bypasses the cookie auth middleware (which only gates /api/*): access is
  * controlled by client API keys. OpenAI-shaped JSON errors throughout.
@@ -59,7 +59,7 @@ export default defineEventHandler(async (event) => {
 
   // ---------- client auth ----------
   const token = bearerFrom(getHeader(event, 'authorization'))
-  if (!token) return jsonError(401, 'Missing API key: send "Authorization: Bearer msk_..."', 'missing_api_key')
+  if (!token) return jsonError(401, 'Missing API key: send "Authorization: Bearer pzz_..."', 'missing_api_key')
   const client = getGatewayClientByTokenHash(hashToken(token))
   if (!client) return jsonError(401, 'Invalid API key', 'invalid_api_key')
   if (!client.enabled) return jsonError(403, 'This API key has been disabled', 'key_disabled')
