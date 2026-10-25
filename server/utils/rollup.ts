@@ -33,6 +33,9 @@ export const THIN_TIERS: Array<{ ageH: number, stepS: number }> = [
 /** fold at most this much wall time per tier per cycle (only matters for catch-up) */
 const TIER_CHUNK_MAX = 30 * DAY
 
+/** the scheduled thinning pass runs at most hourly (it sweeps aged slivers) */
+const THIN_INTERVAL = HOUR
+
 export interface CleanupReport {
   /** net raw rows removed by full thinning */
   rowsRemoved: number
@@ -77,7 +80,12 @@ export function runRollups () {
   db.prepare('DELETE FROM rollup_hourly WHERE hour < ?').run(now - settings.hourlyRetentionD * DAY)
   db.prepare('DELETE FROM server_status WHERE ts < ?').run(now - settings.hourlyRetentionD * DAY)
 
-  runThinning(now, false)
+  // thinning only touches rows older than 24 h, so an hourly sweep is plenty
+  const storage = runtime().storage!
+  if (now - storage.lastThinTs >= THIN_INTERVAL) {
+    runThinning(now, false)
+    storage.lastThinTs = now
+  }
   maybeVacuum(now)
 }
 
@@ -178,6 +186,7 @@ export function cleanupNow (): CleanupReport {
   const rowsRemoved = runThinning(Date.now(), true)
   const storage = runtime().storage!
   storage.lastVacuumTs = Date.now()
+  storage.lastThinTs = Date.now()
   useDb().prepare('VACUUM').run()
   useDb().prepare('PRAGMA wal_checkpoint(TRUNCATE)').run()
   return { rowsRemoved, bytesBefore, bytesAfter: storageStats().dbBytes }

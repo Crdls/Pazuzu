@@ -41,6 +41,8 @@ interface Runtime {
 export interface StorageRuntime {
   /** ts of the last VACUUM (auto or manual); the auto one runs at most daily */
   lastVacuumTs: number
+  /** ts of the last thinning pass; the scheduled one runs at most hourly */
+  lastThinTs: number
 }
 
 /** Outcome of one autoupdate run, written by scripts/autoupdate.mjs. */
@@ -139,7 +141,7 @@ export function runtime (): Runtime {
       lastUpdate: null
     }
   }
-  if (!rt.storage) rt.storage = { lastVacuumTs: 0 }
+  if (!rt.storage) rt.storage = { lastVacuumTs: 0, lastThinTs: 0 }
   return rt
 }
 

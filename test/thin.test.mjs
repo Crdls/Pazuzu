@@ -22,7 +22,10 @@ writeFileSync(process.env.PAZUZU_CONFIG, JSON.stringify({ db: { path: join(dir, 
 const db = useDb()
 const MIN = 60_000
 const HOUR = 3_600_000
-const now = Math.floor(Date.now() / 10_000) * 10_000
+// minute-aligned on purpose: a 10 s grid that straddles minutes leaves the
+// band's trailing minute partial, and tier 1 averages tier-0 *minutes*, so a
+// minute with fewer inputs would skew its window against the raw-input mean
+const now = Math.floor(Date.now() / 60_000) * 60_000
 
 check('tiers get older and coarser', THIN_TIERS.every((t, i) => i === 0 || (t.ageH > THIN_TIERS[i - 1].ageH && t.stepS > THIN_TIERS[i - 1].stepS)))
 check('first tier is older than the 3 h hourly recompute window', THIN_TIERS[0].ageH > 3)
