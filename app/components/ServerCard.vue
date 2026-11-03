@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import type { LiveServer } from '../plugins/live'
-import { fmtBytes, fmtNum, parseLabelStr } from '../utils/format'
+import { fmtBytes, fmtNum, parseLabelStr, relTime } from '../utils/format'
 
 const props = defineProps<{ server: LiveServer }>()
 const { t } = useI18n()
@@ -50,6 +50,18 @@ const ramPct = computed(() => {
 const lastScrape = computed(() => {
   const ts = snap.value?.ts
   return ts ? new Date(ts).toLocaleTimeString('en-GB') : 'never'
+})
+
+// ticking clock so the "X ago" stamps stay fresh between scrapes
+const now = useNow()
+const rel = (ts: number) => relTime(ts, now.value, (k, p) => t(k, p ?? {}))
+const lastLoadLabel = computed(() => {
+  const ts = snap.value?.lastBusy
+  return ts ? rel(ts) : t('card.noLoad')
+})
+const lastReplyLabel = computed(() => {
+  const ts = snap.value?.lastSeen
+  return ts ? rel(ts) : t('card.neverReplied')
 })
 </script>
 
@@ -121,7 +133,8 @@ const lastScrape = computed(() => {
         <GaugeBar :value="ramPct" :label="t('card.ram')" :right="`${fmtBytes(one('strata:ram_used_bytes'))}`" />
       </div>
 
-      <div class="flex items-center justify-between pt-1 text-xs text-muted">
+      <div class="flex flex-wrap items-center justify-between gap-x-3 pt-1 text-xs text-muted">
+        <span>{{ t('card.load', { v: lastLoadLabel }) }}</span>
         <span>{{ t('card.hit', { v: fmtNum((one('strata:last_hit_rate') ?? 0) * 100, 0) }) }}</span>
         <span>{{ t('card.req', { n: fmtNum(one('vllm:request_success_total'), 0) }) }}</span>
         <span>{{ t('card.gen', { n: fmtNum(one('vllm:generation_tokens_total'), 0) }) }}</span>
@@ -130,7 +143,13 @@ const lastScrape = computed(() => {
     </div>
     <div v-else class="py-6 text-center text-sm text-muted">
       <template v-if="!server.enabled">{{ t('card.disabled') }}</template>
-      <template v-else>{{ snap?.error ?? t('card.waiting') }}</template>
+      <template v-else>
+        <div>{{ snap?.error ?? t('card.waiting') }}</div>
+        <div v-if="snap" class="mt-1 text-xs">
+          {{ t('card.lastReply', { v: lastReplyLabel }) }}
+          <template v-if="snap.lastBusy"> · {{ t('card.load', { v: rel(snap.lastBusy) }) }}</template>
+        </div>
+      </template>
     </div>
   </UCard>
 </template>

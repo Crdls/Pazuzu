@@ -50,7 +50,16 @@
     "req": "req {n}",
     "gen": "gén. {n} tok",
     "disabled": "Le serveur est désactivé",
-    "waiting": "En attente du premier sondage…"
+    "waiting": "En attente du premier sondage…",
+    "load": "charge {v}",
+    "noLoad": "aucune charge pour l'instant",
+    "lastReply": "dernière réponse {v}",
+    "neverReplied": "n'a jamais répondu"
+  },
+  "ago": {
+    "now": "à l'instant",
+    "minutes": "il y a {n} min",
+    "hoursMinutes": "il y a {h} h {m} min"
   },
   "servers": {
     "title": "Serveurs",

@@ -50,7 +50,16 @@
     "req": "Anfr. {n}",
     "gen": "gen. {n} Tok.",
     "disabled": "Server ist deaktiviert",
-    "waiting": "Warte auf ersten Durchlauf…"
+    "waiting": "Warte auf ersten Durchlauf…",
+    "load": "Last {v}",
+    "noLoad": "noch keine Last",
+    "lastReply": "letzte Antwort {v}",
+    "neverReplied": "hat nie geantwortet"
+  },
+  "ago": {
+    "now": "gerade eben",
+    "minutes": "vor {n} Min",
+    "hoursMinutes": "vor {h} Std {m} Min"
   },
   "servers": {
     "title": "Server",

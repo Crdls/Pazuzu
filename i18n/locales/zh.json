@@ -50,7 +50,16 @@
     "req": "请求 {n}",
     "gen": "生成 {n} tok",
     "disabled": "服务器已禁用",
-    "waiting": "等待首次采集…"
+    "waiting": "等待首次采集…",
+    "load": "负载 {v}",
+    "noLoad": "尚无负载",
+    "lastReply": "最后响应 {v}",
+    "neverReplied": "从未响应"
+  },
+  "ago": {
+    "now": "刚刚",
+    "minutes": "{n} 分钟前",
+    "hoursMinutes": "{h} 小时 {m} 分钟前"
   },
   "servers": {
     "title": "服务器",

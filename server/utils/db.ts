@@ -20,6 +20,10 @@ export interface ServerRow {
   gateway_mode: GatewayMode
   /** gateway concurrency cap; null = auto (engine live_slots, else config default) */
   gateway_capacity: number | null
+  /** last successful /metrics scrape ts (ms); null = never responded */
+  last_seen: number | null
+  /** last scrape ts (ms) with requests running/waiting; null = never busy */
+  last_busy_ts: number | null
 }
 
 export interface UserRow {
@@ -91,7 +95,9 @@ CREATE TABLE IF NOT EXISTS servers (
   enabled    INTEGER NOT NULL DEFAULT 1,
   created_at INTEGER NOT NULL,
   created_by INTEGER,
-  api_key    TEXT
+  api_key    TEXT,
+  last_seen    INTEGER,
+  last_busy_ts INTEGER
 );
 CREATE TABLE IF NOT EXISTS server_status (
   server_id INTEGER NOT NULL,
@@ -225,6 +231,8 @@ export function useDb (): Database.Database {
     ensureColumn(db, 'users', 'lang', 'TEXT')
     ensureColumn(db, 'gateway_clients', 'servers_all', 'INTEGER NOT NULL DEFAULT 1')
     ensureColumn(db, 'sessions', 'view_as', 'TEXT')
+    ensureColumn(db, 'servers', 'last_seen', 'INTEGER')
+    ensureColumn(db, 'servers', 'last_busy_ts', 'INTEGER')
     // an empty pass_hash could only ever come from the GitLab OAuth sign-up
     db.prepare("UPDATE users SET gitlab = 1 WHERE pass_hash = '' AND gitlab = 0").run()
     // superadmin bootstrap (also self-healing): the first admin owns the top

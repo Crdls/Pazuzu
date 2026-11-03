@@ -95,6 +95,14 @@ export function isBucketSeries (metric: string): boolean {
   return metric.endsWith('_bucket')
 }
 
+/** gauges > 0 that mean the engine has work (used for last-busy tracking) */
+export const LOAD_METRICS: string[] = ['vllm:num_requests_running', 'vllm:num_requests_waiting']
+
+/** True when one scrape's rows report requests running or waiting. */
+export function hasLoad (rows: Array<[string, string, number]>): boolean {
+  return rows.some(([metric, , value]) => value > 0 && LOAD_METRICS.includes(metric))
+}
+
 /**
  * Histogram buckets are stored once a minute instead of every scrape: one
  * snapshot per minute is enough to reconstruct distributions later. True when

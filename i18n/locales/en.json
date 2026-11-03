@@ -50,7 +50,16 @@
     "req": "req {n}",
     "gen": "gen {n} tok",
     "disabled": "Server is disabled",
-    "waiting": "Waiting for first scrape…"
+    "waiting": "Waiting for first scrape…",
+    "load": "load {v}",
+    "noLoad": "no load yet",
+    "lastReply": "last reply {v}",
+    "neverReplied": "never responded"
+  },
+  "ago": {
+    "now": "just now",
+    "minutes": "{n} min ago",
+    "hoursMinutes": "{h} h {m} min ago"
   },
   "servers": {
     "title": "Servers",

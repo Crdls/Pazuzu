@@ -11,6 +11,10 @@ export interface Snapshot {
   error?: string
   /** metric key -> list of [normalized labels, value] */
   metrics: Record<string, Array<[string, number]>>
+  /** last successful scrape ts (ms); survives restarts via the servers table */
+  lastSeen?: number | null
+  /** last scrape ts (ms) with requests running/waiting; null = never busy */
+  lastBusy?: number | null
 }
 
 interface Runtime {

@@ -1,6 +1,6 @@
 import { normalizeLabels, parsePrometheus, type Sample } from './parse'
 import { useDb, type ServerRow } from './db'
-import { BUSY_PCT, COUNTER_RATES, HIST_WINDOW_AVG, isBucketSeries, storeBucketSeries } from './metrics'
+import { BUSY_PCT, COUNTER_RATES, HIST_WINDOW_AVG, LOAD_METRICS, hasLoad, isBucketSeries, storeBucketSeries } from './metrics'
 import { runtime, type Snapshot } from './runtime'
 
 /** Base URL -> metrics endpoint URL. */
@@ -137,14 +137,27 @@ export async function scrapeServer (server: ServerRow): Promise<Snapshot> {
     const rows = buildRows(server.id, now, samples)
     insertSamples(server.id, now, rows, storeBucketSeries(rt.prevTs.get(server.id), now))
     rt.prevTs.set(server.id, now)
-    snapshot = { serverId: server.id, ts: now, up: true, metrics: groupRows(rows) }
+    const busy = hasLoad(rows)
+    useDb()
+      .prepare('UPDATE servers SET last_seen = ?, last_busy_ts = COALESCE(?, last_busy_ts) WHERE id = ?')
+      .run(now, busy ? now : null, server.id)
+    snapshot = {
+      serverId: server.id,
+      ts: now,
+      up: true,
+      metrics: groupRows(rows),
+      lastSeen: now,
+      lastBusy: busy ? now : server.last_busy_ts ?? null
+    }
   } catch (err) {
     snapshot = {
       serverId: server.id,
       ts: now,
       up: false,
       error: err instanceof Error ? err.message : String(err),
-      metrics: {}
+      metrics: {},
+      lastSeen: server.last_seen ?? null,
+      lastBusy: server.last_busy_ts ?? null
     }
   }
   const prevSnap = rt.snapshots.get(server.id)
@@ -162,6 +175,28 @@ export function broadcast (msg: unknown) {
     useWebSocket().publish(msg)
   } catch {
     // websocket layer not ready yet - clients fall back to polling
+  }
+}
+
+/**
+ * Backfill `last_seen`/`last_busy_ts` from stored history for servers where
+ * they are still NULL (right after an upgrade the columns exist but the
+ * samples already prove when the engine answered and had load). Cheap indexed
+ * seeks; runs on every start until the columns are filled.
+ */
+export function seedLastActivity (): void {
+  const db = useDb()
+  const marks = LOAD_METRICS.map(() => '?').join(', ')
+  const seenStmt = db.prepare(`SELECT MAX(ts) AS ts FROM samples WHERE server_id = ? AND metric IN (${marks})`)
+  const busyStmt = db.prepare(`SELECT MAX(ts) AS ts FROM samples WHERE server_id = ? AND metric IN (${marks}) AND value > 0`)
+  const setStmt = db.prepare('UPDATE servers SET last_seen = COALESCE(?, last_seen), last_busy_ts = COALESCE(?, last_busy_ts) WHERE id = ?')
+  const pending = db
+    .prepare('SELECT id, last_seen, last_busy_ts FROM servers WHERE last_seen IS NULL OR last_busy_ts IS NULL')
+    .all() as Array<{ id: number, last_seen: number | null, last_busy_ts: number | null }>
+  for (const s of pending) {
+    const seen = s.last_seen === null ? (seenStmt.get(s.id, ...LOAD_METRICS) as { ts: number | null }).ts : null
+    const busy = s.last_busy_ts === null ? (busyStmt.get(s.id, ...LOAD_METRICS) as { ts: number | null }).ts : null
+    if (seen !== null || busy !== null) setStmt.run(seen, busy, s.id)
   }
 }
 

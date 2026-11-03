@@ -32,6 +32,24 @@ export function fmtDateTime (ts: number): string {
   })
 }
 
+/**
+ * "X ago" label for last-seen/last-busy stamps: minutes below an hour,
+ * hours+minutes up to 4 h, plain date-time beyond that. `t` is the i18n
+ * translate function (ago.* keys).
+ */
+export function relTime (
+  ts: number,
+  now: number,
+  t: (key: string, params?: Record<string, unknown>) => string
+): string {
+  const min = Math.max(0, Math.floor((now - ts) / 60_000))
+  if (min < 1) return t('ago.now')
+  if (min < 60) return t('ago.minutes', { n: min })
+  const h = Math.floor(min / 60)
+  if (h < 4) return t('ago.hoursMinutes', { h, m: min % 60 })
+  return fmtDateTime(ts)
+}
+
 /** `gpu=0,model_name=x` -> { gpu: '0', model_name: 'x' } */
 export function parseLabelStr (s: string): Record<string, string> {
   const out: Record<string, string> = {}

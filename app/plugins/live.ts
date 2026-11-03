@@ -5,6 +5,10 @@ export interface LiveSnapshot {
   error?: string
   /** metric key -> list of [normalized labels, value] */
   metrics: Record<string, Array<[string, number]>>
+  /** last successful scrape ts (ms); null = never responded */
+  lastSeen?: number | null
+  /** last scrape ts (ms) with requests running/waiting; null = never busy */
+  lastBusy?: number | null
 }
 
 export interface LiveServer {
