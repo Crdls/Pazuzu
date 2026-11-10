@@ -171,7 +171,10 @@
     "medianRate": "Token/秒中位数",
     "bestTotal": "最快",
     "worstTotal": "最慢",
-    "toastRunFailed": "无法启动运行"
+    "toastRunFailed": "无法启动运行",
+    "history": "历史记录",
+    "historyClear": "清空历史",
+    "hRuns": "{n} 次"
   },
   "settings": {
     "title": "设置",

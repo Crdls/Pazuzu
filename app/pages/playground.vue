@@ -1,4 +1,7 @@
 <script setup lang="ts">
+import type { HistoryEntry, RunState, RunStatus, ServerState } from '../composables/playground'
+import { MODEL_AUTO, usePlayground } from '../composables/playground'
+
 interface ServerOption {
   id: number
   name: string
@@ -7,229 +10,53 @@ interface ServerOption {
   up: boolean | null
 }
 
-type RunStatus = 'queued' | 'running' | 'done' | 'error' | 'aborted' | 'skipped'
-
-interface RunState {
-  run: number
-  status: RunStatus
-  text: string
-  ttftMs: number | null
-  totalMs: number | null
-  tokens: number | null
-  estimated: boolean
-  error: string | null
-  startedAt: number | null
-  finishedAt: number | null
-}
-
-interface ServerState {
-  serverId: number
-  name: string
-  runs: RunState[]
-}
-
-interface SummaryRow {
-  serverId: number
-  name: string
-  ok: number
-  errors: number
-  medTtftMs: number | null
-  medTotalMs: number | null
-  medTokPerSec: number | null
-  bestTotalMs: number | null
-  worstTotalMs: number | null
-  anyEstimated: boolean
-}
-
 const { t } = useI18n()
-const toast = useToast()
 
 const { data: serverOptions } = useFetch<ServerOption[]>('/api/servers', {
   // forward cookies on the SSR-side call so the auth middleware lets it through
   headers: useRequestHeaders(['cookie'])
 })
 
-const prompt = ref('')
-const selected = ref<number[]>([])
-const runs = ref(1)
-const temperature = ref<number | null>(0.7)
-const maxTokens = ref<number | null>(256)
-// Reka refuses an empty SelectItem value, so "Auto" rides on a sentinel
-const MODEL_AUTO = '__auto__'
-const model = ref(MODEL_AUTO)
-const models = ref<string[]>([])
+// all run state lives in the shared composable: navigating away does not
+// abort the batch, and the form/batch/history survive a reload
+const pg = usePlayground()
+const { form, batch, summary, history, running, models, tick } = pg
+const historyOpen = ref(false)
+onMounted(() => pg.restore())
 
-const running = ref(false)
-const results = ref<ServerState[]>([])
-const summary = ref<SummaryRow[] | null>(null)
-let abort: AbortController | null = null
-
-// slow ticker: repaints the live total/tok/s badges while a run streams
-const tick = ref(0)
-let ticker: ReturnType<typeof setInterval> | undefined
-onBeforeUnmount(() => {
-  if (ticker) clearInterval(ticker)
-  abort?.abort()
-})
-
-function toggleServer (id: number) {
-  if (running.value) return
-  selected.value = selected.value.includes(id)
-    ? selected.value.filter(x => x !== id)
-    : [...selected.value, id]
+function selectAllServers () {
+  form.value.serverIds = (serverOptions.value ?? []).map(s => s.id)
 }
 
-// the model list comes from the first selected engine - engines usually
-// serve exactly one model, so the same id is right for all of them
-async function loadModels () {
-  const first = selected.value[0]
-  models.value = []
-  if (first == null) return
-  try {
-    models.value = (await $fetch<{ models: string[] }>('/api/inference/models', { query: { id: first } })).models
-  } catch { /* auto mode still works: many engines accept a missing model */ }
+// keep the selection in list order, so "first server" is stable for /v1/models
+function toggleServer (id: number, on: boolean) {
+  const set = new Set(form.value.serverIds)
+  if (on) set.add(id)
+  else set.delete(id)
+  form.value.serverIds = (serverOptions.value ?? []).filter(s => set.has(s.id)).map(s => s.id)
 }
-watch(() => selected.value[0], () => { void loadModels() })
 
 const modelItems = computed(() => [
   { label: t('playground.modelAuto'), value: MODEL_AUTO },
   ...models.value.map(m => ({ label: m, value: m }))
 ])
 
-function newRun (run: number): RunState {
-  return {
-    run,
-    status: 'queued',
-    text: '',
-    ttftMs: null,
-    totalMs: null,
-    tokens: null,
-    estimated: false,
-    error: null,
-    startedAt: null,
-    finishedAt: null
-  }
+function startRun () {
+  void pg.start((serverOptions.value ?? []).filter(s => form.value.serverIds.includes(s.id)))
 }
 
-async function start () {
-  if (running.value || !prompt.value.trim() || !selected.value.length) return
-  const servers = (serverOptions.value ?? []).filter(s => selected.value.includes(s.id))
-  results.value = servers.map(s => ({
-    serverId: s.id,
-    name: s.name,
-    runs: Array.from({ length: runs.value }, (_, i) => newRun(i + 1))
-  }))
-  summary.value = null
-  running.value = true
-  if (ticker) clearInterval(ticker)
-  ticker = setInterval(() => { tick.value++ }, 250)
-  abort = new AbortController()
-  try {
-    const res = await fetch('/api/inference/run', {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({
-        serverIds: servers.map(s => s.id),
-        prompt: prompt.value.trim(),
-        runs: runs.value,
-        ...(model.value !== MODEL_AUTO ? { model: model.value } : {}),
-        ...(typeof temperature.value === 'number' ? { temperature: temperature.value } : {}),
-        ...(typeof maxTokens.value === 'number' ? { maxTokens: maxTokens.value } : {})
-      }),
-      signal: abort.signal
-    })
-    if (!res.ok) {
-      let message = `HTTP ${res.status}`
-      try { message = (await res.json() as { statusMessage?: string })?.statusMessage ?? message } catch { /* keep the status */ }
-      toast.add({ title: t('playground.toastRunFailed'), description: message, color: 'error' })
-      return
-    }
-    const reader = res.body!.getReader()
-    const decoder = new TextDecoder()
-    let buffer = ''
-    for (;;) {
-      const { done, value } = await reader.read()
-      if (done) break
-      buffer += decoder.decode(value, { stream: true })
-      let cut = buffer.indexOf('\n\n')
-      while (cut >= 0) {
-        dispatchFrame(buffer.slice(0, cut))
-        buffer = buffer.slice(cut + 2)
-        cut = buffer.indexOf('\n\n')
-      }
-    }
-  } catch (err) {
-    if ((err as Error)?.name !== 'AbortError') {
-      toast.add({ title: t('playground.toastRunFailed'), description: (err as Error)?.message ?? String(err), color: 'error' })
-    }
-  } finally {
-    running.value = false
-    if (ticker) { clearInterval(ticker); ticker = undefined }
-    for (const st of results.value) {
-      for (const r of st.runs) {
-        // a batch that ended mid-flight: the stream is over, these runs are dead
-        if (r.status === 'running') r.status = 'aborted'
-        else if (r.status === 'queued') r.status = 'skipped'
-      }
-    }
-    abort = null
-  }
+function applyHistoryEntry (h: HistoryEntry) {
+  pg.applyEntry(h)
+  historyOpen.value = false
 }
 
-function stop () {
-  abort?.abort()
+function historyNames (h: HistoryEntry): string {
+  const byId = new Map((serverOptions.value ?? []).map(s => [s.id, s.name]))
+  return h.serverIds.map(id => byId.get(id) ?? `#${id}`).join(', ')
 }
 
-function dispatchFrame (frame: string) {
-  for (const line of frame.split('\n')) {
-    if (!line.startsWith('data:')) continue // keep-alive comments carry no payload
-    let ev: Record<string, unknown>
-    try { ev = JSON.parse(line.slice(5)) } catch { continue }
-    applyEvent(ev)
-  }
-}
-
-function runOf (serverId: number, run: number): RunState | undefined {
-  return results.value.find(s => s.serverId === serverId)?.runs.find(r => r.run === run)
-}
-
-function applyEvent (ev: Record<string, unknown>) {
-  const run = ev.type === 'summary' || ev.type === 'end' ? undefined : runOf(Number(ev.serverId), Number(ev.run))
-  switch (ev.type) {
-    case 'start':
-      if (run) { run.status = 'running'; run.startedAt = Date.now() }
-      break
-    case 'firstToken':
-      if (run) run.ttftMs = Number(ev.ttftMs)
-      break
-    case 'delta':
-      if (run) run.text += String(ev.text ?? '')
-      break
-    case 'done':
-      if (run) {
-        run.status = 'done'
-        run.totalMs = Number(ev.totalMs)
-        run.tokens = Number(ev.tokens)
-        run.estimated = Boolean(ev.estimated)
-        run.finishedAt = Date.now()
-      }
-      break
-    case 'error':
-      if (run) {
-        run.status = 'error'
-        run.error = String(ev.error ?? 'error')
-        run.finishedAt = Date.now()
-      }
-      break
-    case 'summary': {
-      const names = new Map(results.value.map(s => [s.serverId, s.name]))
-      summary.value = (ev.servers as Omit<SummaryRow, 'name'>[]).map(row => ({
-        ...row,
-        name: names.get(row.serverId) ?? String(row.serverId)
-      }))
-      break
-    }
-  }
+function historyModel (h: HistoryEntry): string {
+  return h.model === MODEL_AUTO ? t('playground.modelAuto') : h.model
 }
 
 // ---------- display helpers ----------
@@ -282,7 +109,7 @@ function runStatusColor (s: RunStatus): 'success' | 'error' | 'primary' | 'neutr
   return s === 'done' ? 'success' : s === 'error' ? 'error' : s === 'running' ? 'primary' : 'neutral'
 }
 /** Flat log of every run that has started, newest server order kept. */
-const runLog = computed(() => results.value.flatMap(st =>
+const runLog = computed(() => (batch.value?.servers ?? []).flatMap(st =>
   st.runs.filter(r => r.status !== 'queued' && r.status !== 'skipped').map(r => ({ server: st.name, r }))
 ))
 </script>
@@ -296,9 +123,51 @@ const runLog = computed(() => results.value.flatMap(st =>
 
     <UCard variant="soft" class="bg-elevated/30 mb-5">
       <div class="space-y-4">
-        <UFormField :label="t('playground.prompt')">
+        <UFormField>
+          <template #label>
+            <span class="flex items-center gap-1.5">
+              {{ t('playground.prompt') }}
+              <UPopover v-if="history.length" v-model:open="historyOpen">
+                <UButton size="xs" color="neutral" variant="ghost" icon="i-lucide-history">
+                  {{ t('playground.history') }}
+                </UButton>
+                <template #content>
+                  <div class="w-96 max-h-80 overflow-y-auto">
+                    <div
+                      v-for="h in history"
+                      :key="h.id"
+                      class="group flex items-start gap-1 px-3 py-2 border-b border-default/50 last:border-0 hover:bg-elevated/50 cursor-pointer"
+                      @click="applyHistoryEntry(h)"
+                    >
+                      <div class="min-w-0 flex-1">
+                        <div class="text-[13px] leading-5 line-clamp-2">{{ h.prompt }}</div>
+                        <div class="text-[11px] text-dimmed truncate">
+                          {{ new Date(h.ts).toLocaleString() }} · {{ historyNames(h) }} ·
+                          {{ t('playground.hRuns', { n: h.runs }) }} · {{ historyModel(h) }}
+                        </div>
+                      </div>
+                      <UButton
+                        size="xs"
+                        color="neutral"
+                        variant="ghost"
+                        icon="i-lucide-x"
+                        class="opacity-0 group-hover:opacity-100 shrink-0"
+                        :aria-label="t('playground.historyClear')"
+                        @click.stop="pg.removeEntry(h.id)"
+                      />
+                    </div>
+                    <div class="p-2 text-center border-t border-default">
+                      <UButton size="xs" color="neutral" variant="ghost" icon="i-lucide-trash-2" @click="pg.clearHistory(); historyOpen = false">
+                        {{ t('playground.historyClear') }}
+                      </UButton>
+                    </div>
+                  </div>
+                </template>
+              </UPopover>
+            </span>
+          </template>
           <UTextarea
-            v-model="prompt"
+            v-model="form.prompt"
             :rows="4"
             :placeholder="t('playground.promptPlaceholder')"
             :disabled="running"
@@ -308,45 +177,54 @@ const runLog = computed(() => results.value.flatMap(st =>
 
         <UFormField :label="t('playground.servers')">
           <div v-if="!serverOptions?.length" class="text-sm text-muted">{{ t('playground.serversEmpty') }}</div>
-          <div v-else class="flex flex-wrap gap-1.5">
-            <button
-              v-for="s in serverOptions"
-              :key="s.id"
-              type="button"
-              class="flex items-center gap-1.5 rounded-full border border-default px-2.5 py-1 text-sm transition-colors disabled:opacity-50"
-              :class="selected.includes(s.id) ? 'bg-primary/10 border-primary/50 text-default' : 'text-muted hover:bg-elevated'"
-              :disabled="running"
-              @click="toggleServer(s.id)"
-            >
-              <span class="size-1.5 rounded-full shrink-0" :class="s.up === false ? 'bg-error' : 'bg-success'" />
-              <span class="truncate max-w-40">{{ s.name }}</span>
-            </button>
-          </div>
+          <template v-else>
+            <div class="flex items-center gap-2 mb-1.5">
+              <UButton size="xs" color="neutral" variant="outline" :disabled="running" @click="selectAllServers">
+                {{ t('common.selectAll') }}
+              </UButton>
+              <UButton size="xs" color="neutral" variant="outline" :disabled="running" @click="form.serverIds = []">
+                {{ t('common.selectNone') }}
+              </UButton>
+            </div>
+            <div class="max-h-44 overflow-y-auto rounded-md border border-default divide-y divide-default">
+              <div v-for="s in serverOptions" :key="s.id" class="flex items-center gap-2 px-2.5 py-1.5 text-sm hover:bg-elevated/50">
+                <label class="flex min-w-0 flex-1 cursor-pointer items-center gap-2">
+                  <UCheckbox
+                    :model-value="form.serverIds.includes(s.id)"
+                    :disabled="running"
+                    @update:model-value="toggleServer(s.id, $event as boolean)"
+                  />
+                  <span class="truncate">{{ s.name }}</span>
+                </label>
+                <span class="size-1.5 rounded-full shrink-0" :class="s.up === false ? 'bg-error' : 'bg-success'" />
+              </div>
+            </div>
+          </template>
         </UFormField>
 
         <div class="flex flex-wrap items-end gap-x-4 gap-y-2">
           <UFormField :label="t('playground.runs')">
-            <UInputNumber v-model="runs" :min="1" :max="10" :step="1" :disabled="running" class="w-24" />
+            <UInputNumber v-model="form.runs" :min="1" :max="10" :step="1" :disabled="running" class="w-24" />
           </UFormField>
           <UFormField :label="t('playground.temperature')">
-            <UInputNumber v-model="temperature" :min="0" :max="2" :step="0.1" :disabled="running" class="w-28" />
+            <UInputNumber v-model="form.temperature" :min="0" :max="2" :step="0.1" :disabled="running" class="w-28" />
           </UFormField>
           <UFormField :label="t('playground.maxTokens')">
-            <UInputNumber v-model="maxTokens" :min="1" :max="16384" :step="1" :disabled="running" class="w-28" />
+            <UInputNumber v-model="form.maxTokens" :min="1" :max="16384" :step="1" :disabled="running" class="w-28" />
           </UFormField>
           <UFormField :label="t('playground.model')" :help="t('playground.modelHelp')">
-            <USelect v-model="model" :items="modelItems" :disabled="running" class="w-56" />
+            <USelect v-model="form.model" :items="modelItems" :disabled="running" class="w-56" />
           </UFormField>
           <div class="ml-auto flex items-center gap-2">
             <UButton
               v-if="!running"
               icon="i-lucide-play"
-              :disabled="!prompt.trim() || !selected.length"
-              @click="start"
+              :disabled="!form.prompt.trim() || !form.serverIds.length"
+              @click="startRun"
             >
               {{ t('playground.run') }}
             </UButton>
-            <UButton v-else color="error" icon="i-lucide-square" @click="stop">
+            <UButton v-else color="error" icon="i-lucide-square" @click="pg.stop()">
               {{ t('playground.stop') }}
             </UButton>
           </div>
@@ -355,8 +233,8 @@ const runLog = computed(() => results.value.flatMap(st =>
     </UCard>
 
     <!-- live columns: one per server in the batch -->
-    <div v-if="results.length" class="grid grid-cols-1 lg:grid-cols-2 2xl:grid-cols-3 gap-3 mb-5">
-      <div v-for="st in results" :key="st.serverId" class="rounded-lg bg-elevated/50 p-3 space-y-2 min-w-0">
+    <div v-if="batch" class="grid grid-cols-1 lg:grid-cols-2 2xl:grid-cols-3 gap-3 mb-5">
+      <div v-for="st in batch.servers" :key="st.serverId" class="rounded-lg bg-elevated/50 p-3 space-y-2 min-w-0">
         <div class="flex items-center gap-1.5 min-w-0">
           <UIcon :name="columnIcon(st).icon" class="size-4 shrink-0" :class="columnIcon(st).cls" />
           <span class="truncate font-semibold text-sm">{{ st.name }}</span>
@@ -486,7 +364,7 @@ const runLog = computed(() => results.value.flatMap(st =>
       </table>
     </UCard>
 
-    <div v-if="!results.length" class="py-12 text-center text-sm text-muted">
+    <div v-if="!batch" class="py-12 text-center text-sm text-muted">
       <AbyssEyes class="size-9 mx-auto mb-2" />
       <div>{{ t('playground.emptyHint') }}</div>
     </div>

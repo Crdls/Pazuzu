@@ -171,7 +171,10 @@
     "medianRate": "Mediane Tok/s",
     "bestTotal": "Beste",
     "worstTotal": "Schlechteste",
-    "toastRunFailed": "Der Lauf konnte nicht gestartet werden"
+    "toastRunFailed": "Der Lauf konnte nicht gestartet werden",
+    "history": "Verlauf",
+    "historyClear": "Verlauf löschen",
+    "hRuns": "{n} Lauf|{n} Läufe"
   },
   "settings": {
     "title": "Einstellungen",

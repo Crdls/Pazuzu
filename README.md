@@ -33,7 +33,9 @@ that load-balances application calls across all your engines.
   their answers and speed: live streamed text side by side, TTFT / total /
   tok/s per run, N repeat runs per engine and a median summary. Requests go
   straight to `/v1/chat/completions` with the server's API key — past the
-  gateway, its queues and its admission control.
+  gateway, its queues and its admission control. A batch keeps streaming
+  while you browse other pages, and the form, the last batch and a request
+  history live in the browser (localStorage), so a reload loses nothing.
 - **Settings** — split into tabs (each linkable directly via `?tab=`):
   **Personal** (appearance, language, password, view-as), **Data collection** (poller
   and rollup intervals — 30 s by default — plus hourly retention, all applied

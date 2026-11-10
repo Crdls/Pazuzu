@@ -171,7 +171,10 @@
     "medianRate": "Медиана ток/с",
     "bestTotal": "Лучший",
     "worstTotal": "Худший",
-    "toastRunFailed": "Не удалось запустить прогон"
+    "toastRunFailed": "Не удалось запустить прогон",
+    "history": "История",
+    "historyClear": "Очистить историю",
+    "hRuns": "{n} повтор|{n} повтора|{n} повторов|{n} повтора"
   },
   "settings": {
     "title": "Настройки",

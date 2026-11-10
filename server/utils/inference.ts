@@ -124,6 +124,22 @@ export function tokPerSecOf (tokens: number, totalMs: number): number | null {
   return (tokens / totalMs) * 1000
 }
 
+/** Clip long streamed text for persistence: keeps head and tail around a marker. */
+export function clipText (text: string, cap = 8000): string {
+  if (text.length <= cap) return text
+  const head = Math.floor(cap * 0.75)
+  return `${text.slice(0, head)}\n…\n${text.slice(text.length - (cap - head))}`
+}
+
+/**
+ * Prepend a request to the Playground's history: an entry with the same key
+ * (the same request) is re-added on top instead of duplicated; capped.
+ */
+export function pushHistory<T> (history: T[], entry: T, keyOf: (e: T) => string, limit = 50): T[] {
+  const key = keyOf(entry)
+  return [entry, ...history.filter(e => keyOf(e) !== key)].slice(0, limit)
+}
+
 /** Median stats per server; errors are counted, never averaged in. */
 export function summarizeRuns (outcomes: RunOutcome[]): ServerSummary[] {
   const byServer = new Map<number, RunOutcome[]>()

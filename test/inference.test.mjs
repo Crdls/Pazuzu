@@ -3,7 +3,7 @@
 // Run: node test/inference.test.mjs
 import {
   buildChatBody, dataLinesOf, splitSseFrames, deltaTextOf, usageFromChunk,
-  estimateTokens, median, tokPerSecOf, summarizeRuns
+  estimateTokens, median, tokPerSecOf, summarizeRuns, clipText, pushHistory
 } from '../server/utils/inference.ts'
 
 let failed = 0
@@ -72,6 +72,22 @@ check('estimated runs flagged', sum[0].anyEstimated && !sum[1].anyEstimated)
 const allBad = summarizeRuns([bad])
 check('all-error server has no medians', allBad[0].medTtftMs === null && allBad[0].medTotalMs === null && allBad[0].bestTotalMs === null)
 check('run missing ttft excluded from median', summarizeRuns([r(1, 1, { ttftMs: null }), r(1, 2, { ttftMs: 90 })])[0].medTtftMs === 90)
+
+// ---------- history & clipping ----------
+check('clipText keeps short text intact', clipText('hello') === 'hello')
+check('clipText caps long text with a middle marker', (() => {
+  const long = 'x'.repeat(20_000)
+  const clipped = clipText(long, 1000)
+  return clipped.length < long.length && clipped.includes('…') && clipped.startsWith('xxx') && clipped.endsWith('xxx')
+})())
+check('clipText respects custom cap', clipText('abcdefghij', 5) === 'abc\n…\nij')
+const keyOf = (h) => h.id
+const h1 = { id: 'a', prompt: 'first' }
+const h2 = { id: 'b', prompt: 'second' }
+check('pushHistory prepends a new entry', pushHistory([h1], h2, keyOf).map(h => h.id).join(',') === 'b,a')
+check('pushHistory moves a re-run to the top', pushHistory([h1, h2], { id: 'a', prompt: 'first' }, keyOf).map(h => h.id).join(',') === 'a,b')
+check('pushHistory dedupes by key', pushHistory([h1, h2], h1, keyOf).length === 2)
+check('pushHistory caps at the limit', pushHistory(Array.from({ length: 60 }, (_, i) => ({ id: String(i) })), { id: 'new' }, keyOf).length === 50)
 
 console.log(failed === 0 ? '\nAll checks passed' : `\n${failed} checks FAILED`)
 process.exitCode = failed > 0 ? 1 : 0

@@ -171,7 +171,10 @@
     "medianRate": "tok/s mediana",
     "bestTotal": "Mejor",
     "worstTotal": "Peor",
-    "toastRunFailed": "No se pudo iniciar la ejecución"
+    "toastRunFailed": "No se pudo iniciar la ejecución",
+    "history": "Historial",
+    "historyClear": "Vaciar historial",
+    "hRuns": "{n} ejecución|{n} ejecuciones"
   },
   "settings": {
     "title": "Ajustes",
