@@ -53,6 +53,7 @@ async function checkUpdate () {
 const nav = computed(() => [
   { to: '/', icon: 'i-lucide-layout-dashboard', label: 'nav.dashboard' },
   { to: '/heatmap', icon: 'i-lucide-grid-3x3', label: 'nav.heatmap' },
+  { to: '/playground', icon: 'i-lucide-flask-conical', label: 'nav.playground' },
   { to: '/servers', icon: 'i-lucide-server', label: 'nav.servers' },
   // gateway clients work with auth off too (trusted LAN), so the page is only
   // admin-gated while auth is on (the API enforces it regardless)

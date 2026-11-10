@@ -27,6 +27,10 @@
 - **热力图** — 所有服务器按时间桶的负载，
   时间范围 1 / 3 / 12 / 24 小时 / 7 天 / 30 天 / 一年，可选指标（GPU 利用率、CPU、
   tok/s、队列、显存 %、功耗、命中率等）。时间范围和指标会在浏览器中记住（cookie）。
+- **试验场** — 把一个提示词同时发给多个引擎，对比回答和速度：
+  并排实时输出、每轮 TTFT / 总时长 / tok/s、每个引擎 N 次重复，
+  外加中位数汇总。请求带着服务器 API 密钥直接发往 `/v1/chat/completions`——
+  不经过网关及其队列与准入控制。
 - **设置** — 分为多个标签页（任意一页都可用 `?tab=` 链接直接打开）：
   **个人**（外观、语言、密码、角色预览）、**数据采集**（轮询间隔和汇总间隔
   — 默认 30 秒 — 以及小时聚合的保留深度，修改后立即生效；
@@ -306,18 +310,19 @@ Authorization: Bearer pzz_…
 
 ```
 app/            Vue 3 + Nuxt UI 前端
-  pages/        仪表盘、服务器详情、热力图、服务器列表、客户端、用户、设置、登录
+  pages/        仪表盘、服务器详情、热力图、试验场、服务器列表、客户端、用户、设置、登录
   components/   ServerCard、MetricChart (uPlot)、LoadHeatmap 等
   plugins/live.ts  共享状态 + WebSocket 客户端
 i18n/locales/   语言词典：en、ru、de、es、fr、zh
 server/
   middleware/   auth.ts — /api 的会话关卡（由 config.json 开启）
   utils/        Prometheus 解析器、SQLite、指标目录、采集器、汇总与多级降采样、
-                认证原语、权限规则、GitLab OAuth 辅助、gateway/（路由、优先级队列、会话亲和、代理）
+                认证原语、权限规则、GitLab OAuth 辅助、gateway/（路由、优先级队列、会话亲和、代理）、
+                inference.ts（试验场的 chat 请求体、SSE 解析与中位数统计）
   plugins/      后台循环（scrape、rollups、gateway、更新检查）
   api/          servers CRUD、live、range、heatmap、settings、config、storage
                 （统计 + 清理）、auth、users、gateway（状态、客户端、轮换、IP）、
-                update（status/check/apply）
+                inference（运行 + 模型）、update（status/check/apply）
   routes/       _ws.ts WebSocket 端点、v1/[...].ts 网关代理
 scripts/        reset-password.mjs — 密码恢复（无需邮箱）
                 autoupdate.mjs — "更新"按钮执行：pull + install + build + 重启
@@ -326,7 +331,7 @@ scripts/        reset-password.mjs — 密码恢复（无需邮箱）
                            （降采样 + VACUUM）；请在服务器停止时运行
                 seed-history.mjs — 回填合成正弦历史数据，用于验证
                                    降采样阶梯（开发工具）
-test/           基于真实 /metrics 固定数据的解析器测试 + 认证/配置/网关/更新/指标目录/降采样测试
+test/           基于真实 /metrics 固定数据的解析器测试 + 认证/配置/网关/更新/指标目录/降采样/试验场测试
 update.sh|.bat  一键安装/更新：pull + install --omit=dev + build
 ```
 
@@ -336,6 +341,7 @@ update.sh|.bat  一键安装/更新：pull + install --omit=dev + build
 - `GET /api/live` — 所有服务器的当前快照
 - `GET /api/range?serverId&metric&from&to` — 指标历史（raw/hourly/daily — 数据源自动选择）
 - `GET /api/heatmap?metric&period=1h|3h|12h|24h|7d|30d|1y` — 服务器 × 时间桶矩阵
+- `POST /api/inference/run` — 试验场：一个提示词同时发往多个引擎（每个引擎 1–10 次重复），以 SSE 返回实时文本与计时（TTFT / 总时长 / tok/s）及中位数汇总；`GET /api/inference/models?id=` — 引擎所提供的模型列表（用于填写 `model` 字段）
 - `GET|PUT /api/settings`（`PUT`：开启验证后仅管理员）
 - `GET|PUT /api/config` — 读取并重写 `config.json`（开启验证后仅超级管理员；除 `db.path` 外全部立即生效）
 - `GET /api/storage` — 数据库大小与行数；`POST /api/storage/cleanup` — 手动清理：汇总、全量降采样、`VACUUM`（开启验证后仅超级管理员）
@@ -361,6 +367,7 @@ node test/client-access.test.mjs
 node test/update.test.mjs
 node test/metrics.test.mjs
 node test/thin.test.mjs
+node test/inference.test.mjs
 ```
 
 ## 备注

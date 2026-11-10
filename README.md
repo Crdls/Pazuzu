@@ -29,6 +29,11 @@ that load-balances application calls across all your engines.
   1h / 3h / 12h / 24h / 7d / 30d / year, selectable metric (GPU util, CPU, tok/s,
   queue, VRAM %, power, hit rate, etc.). Period and metric are remembered
   per browser (cookie).
+- **Playground** — send one prompt to several engines at once and compare
+  their answers and speed: live streamed text side by side, TTFT / total /
+  tok/s per run, N repeat runs per engine and a median summary. Requests go
+  straight to `/v1/chat/completions` with the server's API key — past the
+  gateway, its queues and its admission control.
 - **Settings** — split into tabs (each linkable directly via `?tab=`):
   **Personal** (appearance, language, password, view-as), **Data collection** (poller
   and rollup intervals — 30 s by default — plus hourly retention, all applied
@@ -365,7 +370,7 @@ TTFT / ITL / E2E, engine and memory busy percentages.
 
 ```
 app/            Vue 3 + Nuxt UI frontend
-  pages/        dashboard, server, heatmap, servers, clients, users, settings, login
+  pages/        dashboard, server, heatmap, playground, servers, clients, users, settings, login
   components/   ServerCard, MetricChart (uPlot), LoadHeatmap, ...
   plugins/live.ts  shared state + WebSocket client
 i18n/locales/   dictionaries: en, ru, de, es, fr, zh
@@ -374,11 +379,12 @@ server/
   utils/        Prometheus parser, SQLite, metric catalog, scraper, rollups and
                 multi-resolution thinning, auth primitives, permission rules,
                 GitLab OAuth helpers, gateway/ (routing, priority queue,
-                session affinity, proxy)
+                session affinity, proxy), inference.ts (Playground chat body,
+                SSE parsing, median stats)
   plugins/      background loops (scrape, rollups, gateway, update check)
   api/          servers CRUD, live, range, heatmap, settings, config, storage
                 (stats + cleanup), auth, users, gateway (status, clients,
-                rotate, IPs), update (status/check/apply)
+                rotate, IPs), inference (run + models), update (status/check/apply)
   routes/       _ws.ts WebSocket endpoint, v1/[...].ts gateway proxy
 scripts/        reset-password.mjs - lost password recovery (no email)
                 autoupdate.mjs - applied by the Update button: pull + install
@@ -388,7 +394,7 @@ scripts/        reset-password.mjs - lost password recovery (no email)
                 seed-history.mjs - retro-fill synthetic sine history to
                                    exercise the thinning ladder (dev tool)
 test/           parser test on real /metrics fixtures + auth/config/gateway/
-                client-access/update/metrics/thin tests
+                client-access/update/metrics/thin/inference tests
 update.sh|.bat  one-shot install/update: pull + install --omit=dev + build
 ```
 
@@ -398,6 +404,7 @@ update.sh|.bat  one-shot install/update: pull + install --omit=dev + build
 - `GET /api/live` — current snapshots of all servers
 - `GET /api/range?serverId&metric&from&to` — metric history (raw/hourly/daily — the source is picked automatically)
 - `GET /api/heatmap?metric&period=1h|3h|12h|24h|7d|30d|1y` — servers × buckets matrix
+- `POST /api/inference/run` — Playground: one prompt to several engines at once (1–10 repeat runs per engine), answered as SSE with live text and timings (TTFT / total / tok/s) and a median summary; `GET /api/inference/models?id=` — model ids served by an engine (to fill the `model` field)
 - `GET|PUT /api/settings` (`PUT`: admin only when auth is on)
 - `GET|PUT /api/config` — read and rewrite `config.json` (superadmin only when auth is on; everything except `db.path` applies immediately)
 - `GET /api/storage` — database size and row counts; `POST /api/storage/cleanup` — out-of-band cleanup: rollups, full thinning, `VACUUM` (superadmin only when auth is on)
@@ -423,6 +430,7 @@ node test/client-access.test.mjs
 node test/update.test.mjs
 node test/metrics.test.mjs
 node test/thin.test.mjs
+node test/inference.test.mjs
 ```
 
 ## Notes
