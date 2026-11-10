@@ -73,7 +73,8 @@ onMounted(() => {
   void load()
   timer = setInterval(load, 30_000)
 })
-watch([rangeIdx, locale], load)
+// id too: moving between two servers reuses this page instance, onMounted never re-fires
+watch([id, rangeIdx, locale], load)
 onBeforeUnmount(() => { if (timer) clearInterval(timer) })
 </script>
 
