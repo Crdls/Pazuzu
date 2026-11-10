@@ -84,6 +84,22 @@ let persistTimer: ReturnType<typeof setTimeout> | undefined
 let restored = false
 let pageHideBound = false
 
+/** History-entry id. crypto.randomUUID exists only in secure contexts, but
+ *  Pazuzu is routinely served over plain http on the LAN - fall back to
+ *  getRandomValues (available everywhere) and then to Math.random. */
+function newId (): string {
+  const c = globalThis.crypto as (Crypto & { randomUUID?: () => string }) | undefined
+  if (c?.randomUUID) return c.randomUUID()
+  if (c?.getRandomValues) {
+    const b = c.getRandomValues(new Uint8Array(16))
+    b[6] = (b[6]! & 0x0f) | 0x40
+    b[8] = (b[8]! & 0x3f) | 0x80
+    const hex = [...b].map(x => x.toString(16).padStart(2, '0')).join('')
+    return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`
+  }
+  return `id-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`
+}
+
 export function usePlayground () {
   const { t } = useI18n()
   const toast = useToast()
@@ -258,7 +274,7 @@ export function usePlayground () {
     }
     summary.value = null
     const entry: HistoryEntry = {
-      id: crypto.randomUUID(),
+      id: newId(),
       ts: Date.now(),
       prompt,
       serverIds: [...form.value.serverIds],
