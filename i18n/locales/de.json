@@ -178,6 +178,7 @@
     "thoughts": "Gedanken",
     "reasoning": "Reasoning-Stufe",
     "reasonAuto": "Auto",
+    "reasonOff": "Aus",
     "reasonLow": "Niedrig",
     "reasonMedium": "Mittel",
     "reasonHigh": "Hoch"

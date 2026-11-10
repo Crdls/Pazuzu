@@ -178,6 +178,7 @@
     "thoughts": "Razonamiento",
     "reasoning": "Nivel de razonamiento",
     "reasonAuto": "Auto",
+    "reasonOff": "Desactivado",
     "reasonLow": "Bajo",
     "reasonMedium": "Medio",
     "reasonHigh": "Alto"

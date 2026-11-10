@@ -33,7 +33,7 @@ interface RunRequestBody {
   reasoningEffort?: unknown
 }
 
-const REASONING_EFFORTS = ['low', 'medium', 'high']
+const REASONING_EFFORTS = ['none', 'low', 'medium', 'high']
 
 function describeError (err: unknown): string {
   if (err instanceof Error) return err.message || err.name
@@ -68,7 +68,7 @@ function parseOptions (body: RunRequestBody | null): { ids: number[], prompt: st
   const reasoningEffort = body?.reasoningEffort === undefined || body.reasoningEffort === null || body.reasoningEffort === '' ? null
     : String(body.reasoningEffort).trim().toLowerCase()
   if (reasoningEffort !== null && !REASONING_EFFORTS.includes(reasoningEffort)) {
-    throw createError({ statusCode: 400, statusMessage: 'reasoningEffort must be low|medium|high' })
+    throw createError({ statusCode: 400, statusMessage: 'reasoningEffort must be none|low|medium|high' })
   }
   return { ids: ids as number[], prompt, runs, model, temperature, maxTokens, reasoningEffort }
 }

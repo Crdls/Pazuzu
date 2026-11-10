@@ -43,6 +43,7 @@ const modelItems = computed(() => [
 
 const reasoningItems = computed(() => [
   { label: t('playground.reasonAuto'), value: 'auto' },
+  { label: t('playground.reasonOff'), value: 'none' },
   { label: t('playground.reasonLow'), value: 'low' },
   { label: t('playground.reasonMedium'), value: 'medium' },
   { label: t('playground.reasonHigh'), value: 'high' }

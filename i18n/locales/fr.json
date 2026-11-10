@@ -178,6 +178,7 @@
     "thoughts": "Chaîne de pensée",
     "reasoning": "Effort de raisonnement",
     "reasonAuto": "Auto",
+    "reasonOff": "Désactivé",
     "reasonLow": "Faible",
     "reasonMedium": "Moyen",
     "reasonHigh": "Élevé"

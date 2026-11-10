@@ -178,6 +178,7 @@
     "thoughts": "思考过程",
     "reasoning": "推理强度",
     "reasonAuto": "自动",
+    "reasonOff": "关闭",
     "reasonLow": "低",
     "reasonMedium": "中",
     "reasonHigh": "高"
