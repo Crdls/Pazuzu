@@ -204,9 +204,9 @@ onBeforeUnmount(() => { if (timer) clearInterval(timer) })
         <tbody>
           <tr v-for="server in servers ?? []" :key="server.id" class="border-b border-default/50 last:border-0">
             <td class="py-2.5 pr-3">
-              <NuxtLink :to="`/servers/${server.id}`" class="font-medium hover:text-primary">
-                {{ server.name }}
-              </NuxtLink>
+              <UButton :to="`/servers/${server.id}`" size="xs" color="neutral" variant="soft" class="max-w-full">
+                <span class="truncate">{{ server.name }}</span>
+              </UButton>
               <div v-if="server.createdByName" class="text-xs text-dimmed">
                 {{ t('servers.owner', { name: server.createdByName }) }}
               </div>

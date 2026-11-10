@@ -26,6 +26,11 @@ function roleLabel (role: UserRow['role']): string {
   return role === 'superadmin' ? t('users.roleSuperadmin') : role === 'admin' ? t('users.roleAdmin') : t('users.roleUser')
 }
 
+// a GitLab account can theoretically come without a login - the button still needs a label
+function displayName (user: UserRow): string {
+  return user.username || t('users.noName')
+}
+
 const formOpen = ref(false)
 const editing = ref<UserRow | null>(null)
 const form = reactive({ role: 'user' as 'superadmin' | 'admin' | 'user', disabled: false, password: '', confirm: '' })
@@ -164,8 +169,10 @@ async function remove () {
         <tbody>
           <tr v-for="user in users ?? []" :key="user.id" class="border-b border-default/50 last:border-0">
             <td class="py-2.5 pr-3">
-              <span class="font-medium">{{ user.username }}</span>
-              <span v-if="user.id === meId" class="text-xs text-muted"> ({{ t('users.you') }})</span>
+              <UButton size="xs" color="neutral" variant="soft" :disabled="!canEditRow(user)" @click="openEdit(user)">
+                {{ displayName(user) }}
+              </UButton>
+              <span v-if="user.id === meId" class="text-xs text-muted ml-1">({{ t('users.you') }})</span>
               <UBadge v-if="user.gitlab" color="info" variant="subtle" size="sm" class="ml-2">
                 {{ t('users.gitlab') }}
               </UBadge>
@@ -186,9 +193,6 @@ async function remove () {
             <td class="py-2.5 pr-3 text-muted whitespace-nowrap">{{ fmtTime(user.created_at) }}</td>
             <td class="py-2.5 pr-3 text-muted whitespace-nowrap">{{ fmtTime(user.last_login) }}</td>
             <td class="py-2.5 text-right whitespace-nowrap">
-              <UButton v-if="canEditRow(user)" size="xs" color="neutral" variant="ghost" icon="i-lucide-pencil" @click="openEdit(user)">
-                {{ t('users.edit') }}
-              </UButton>
               <UButton
                 v-if="user.id !== meId && canEditRow(user)"
                 size="xs"
@@ -212,7 +216,7 @@ async function remove () {
     </UCard>
 
     <!-- edit modal -->
-    <UModal v-model:open="formOpen" :title="t('users.editTitle', { name: editing?.username ?? '' })">
+    <UModal v-model:open="formOpen" :title="t('users.editTitle', { name: editing ? displayName(editing) : '' })">
       <template #body>
         <form class="space-y-4" @submit.prevent="save">
           <UFormField :label="t('users.role')">
@@ -298,7 +302,7 @@ async function remove () {
     >
       <template #body>
         <p class="text-sm">
-          {{ t('users.confirmText', { name: deleteTarget?.username ?? '' }) }}
+          {{ t('users.confirmText', { name: deleteTarget ? displayName(deleteTarget) : '' }) }}
         </p>
         <div class="flex justify-end gap-2 pt-4">
           <UButton color="neutral" variant="ghost" @click="deleteTarget = null">

@@ -324,6 +324,7 @@
     "title": "Benutzer",
     "subtitle": "Konten mit Zugang. Rollen, Passwörter und Zugriff werden hier verwaltet.",
     "username": "Benutzername",
+    "noName": "ohne Namen",
     "you": "Sie",
     "add": "Benutzer hinzufügen",
     "addTitle": "Benutzer anlegen",

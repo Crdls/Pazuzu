@@ -324,6 +324,7 @@
     "title": "Users",
     "subtitle": "Accounts allowed to sign in. Roles, passwords and access are managed here.",
     "username": "Username",
+    "noName": "no-name",
     "you": "you",
     "add": "Add user",
     "addTitle": "Add a user",

@@ -98,12 +98,15 @@ function hideTip () {
     <div class="overflow-x-auto pb-2">
       <div class="min-w-[640px] space-y-1">
         <div v-for="row in data.rows" :key="row.serverId" class="flex items-center gap-2">
-          <NuxtLink
+          <UButton
             :to="`/servers/${row.serverId}`"
-            class="w-40 shrink-0 truncate text-sm font-medium hover:text-primary"
+            size="xs"
+            color="neutral"
+            variant="soft"
+            class="w-40 shrink-0"
           >
-            {{ row.name }}
-          </NuxtLink>
+            <span class="truncate">{{ row.name }}</span>
+          </UButton>
           <div
             class="flex-1 grid gap-px"
             :style="{ gridTemplateColumns: `repeat(${data.buckets.length}, minmax(3px, 1fr))` }"

@@ -324,6 +324,7 @@
     "title": "Utilisateurs",
     "subtitle": "Comptes autorisés à se connecter. Les rôles, mots de passe et accès se gèrent ici.",
     "username": "Nom d'utilisateur",
+    "noName": "sans nom",
     "you": "vous",
     "add": "Ajouter un utilisateur",
     "addTitle": "Nouvel utilisateur",

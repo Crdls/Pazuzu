@@ -324,6 +324,7 @@
     "title": "Usuarios",
     "subtitle": "Cuentas con acceso permitido. Los roles, contraseñas y el acceso se gestionan aquí.",
     "username": "Nombre de usuario",
+    "noName": "sin nombre",
     "you": "tú",
     "add": "Añadir usuario",
     "addTitle": "Nuevo usuario",
