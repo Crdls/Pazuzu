@@ -2,7 +2,7 @@
 // parsing and median summaries.
 // Run: node test/inference.test.mjs
 import {
-  buildChatBody, dataLinesOf, splitSseFrames, deltaTextOf, usageFromChunk,
+  buildChatBody, dataLinesOf, splitSseFrames, deltaTextOf, reasoningTextOf, usageFromChunk,
   estimateTokens, median, tokPerSecOf, summarizeRuns, clipText, pushHistory
 } from '../server/utils/inference.ts'
 
@@ -19,6 +19,7 @@ check('stream + usage always requested', body({}).stream === true && body({}).st
 check('model omitted when null', !('model' in body({ model: null })) && body({ model: 'strata-7b' }).model === 'strata-7b')
 check('temperature 0 is kept, not dropped', body({ temperature: 0 }).temperature === 0 && !('temperature' in body({ temperature: null })))
 check('max_tokens omitted when null', !('max_tokens' in body({ maxTokens: null })) && body({ maxTokens: 128 }).max_tokens === 128)
+check('reasoning_effort only when set', !('reasoning_effort' in body({})) && body({ reasoningEffort: 'low' }).reasoning_effort === 'low')
 
 // ---------- SSE frame parsing ----------
 check('data lines joined, leading space stripped', dataLinesOf('data: one\ndata:two') === 'one\ntwo')
@@ -40,6 +41,12 @@ check('non-string content ignored', deltaTextOf(chunk({ weird: true })) === '')
 check('null chunk safe', deltaTextOf(null) === '' && deltaTextOf('text') === '')
 check('array payload parses to no text', deltaTextOf(JSON.parse('[1,2]')) === '' && usageFromChunk(JSON.parse('[1,2]')) === null)
 
+const think = (reasoning, content) => ({ choices: [{ delta: { ...(reasoning === null ? {} : { reasoning_content: reasoning }), ...(content === null ? {} : { content }) } }] })
+check('reasoning channel extracted', reasoningTextOf(think('hmm', null)) === 'hmm')
+check('legacy reasoning field as fallback', reasoningTextOf({ choices: [{ delta: { reasoning: 'old' } }] }) === 'old')
+check('answer deltas are no reasoning', reasoningTextOf(think(null, 'hi')) === '' && reasoningTextOf(chunk('hi')) === '')
+check('empty reasoning delta', reasoningTextOf(think('', 'hi')) === '')
+
 const usage = { prompt_tokens: 7, completion_tokens: 21 }
 check('usage read from final chunk', usageFromChunk({ choices: [], usage }).gen === 21 && usageFromChunk({ choices: [], usage }).prompt === 7)
 check('all-zero usage means none', usageFromChunk({ choices: [], usage: { prompt_tokens: 0, completion_tokens: 0 } }) === null)
@@ -52,26 +59,33 @@ check('median of even run averages the middle', median([10, 20, 30, 40]) === 25)
 check('median of empty is null', median([]) === null)
 check('tok/s over whole run', tokPerSecOf(50, 1000) === 50 && tokPerSecOf(50, 500) === 100)
 check('tok/s undefined for zero duration', tokPerSecOf(10, 0) === null)
+check('tok/s counts only the decode window', tokPerSecOf(50, 1000, 500) === 100)
+check('tok/s falls back to total when TTFT ate it all', tokPerSecOf(1, 500, 490) === 2)
+check('tok/s with a null ttft keeps the whole duration', tokPerSecOf(40, 1000, null) === 40)
 
 // ---------- summaries ----------
 const r = (serverId, run, over = {}) => ({
-  serverId, run, ok: true, ttftMs: 100, totalMs: 1000, tokens: 100, estimated: false, ...over
+  serverId, run, ok: true, ttftMs: 100, firstMs: 100, totalMs: 1000, tokens: 100, estimated: false, ...over
 })
 const s1 = r(1, 1, { ttftMs: 100, totalMs: 1000, tokens: 100 })
-const s2 = r(1, 2, { ttftMs: 300, totalMs: 2000, tokens: 200 })
-const s3 = r(1, 3, { ttftMs: 200, totalMs: 1500, tokens: 150, estimated: true })
+const s2 = r(1, 2, { ttftMs: 300, firstMs: 300, totalMs: 2000, tokens: 200 })
+const s3 = r(1, 3, { ttftMs: 200, firstMs: 200, totalMs: 1500, tokens: 150, estimated: true })
 const bad = r(2, 1, { ok: false, ttftMs: null, totalMs: 400, tokens: 0, error: 'HTTP 502' })
-const ok2 = r(2, 2, { ttftMs: 40, totalMs: 800, tokens: 64 })
+const ok2 = r(2, 2, { ttftMs: 40, firstMs: 40, totalMs: 800, tokens: 64 })
 const sum = summarizeRuns([s2, s1, bad, s3, ok2])
 check('one row per server, sorted by id', sum.length === 2 && sum[0].serverId === 1 && sum[1].serverId === 2)
 check('medians over successful runs', sum[0].medTtftMs === 200 && sum[0].medTotalMs === 1500)
-check('median tok/s is tokens/total per run', Math.abs(sum[0].medTokPerSec - 100) < 1e-9)
+check('median tok/s is tokens over the decode window', Math.abs(sum[0].medTokPerSec - 150 / 1.3) < 1e-6)
+check('per-run tok/s excludes its own ttft', Math.abs(sum[1].medTokPerSec - 64 / 0.76) < 1e-6)
 check('best/worst total span successful runs', sum[0].bestTotalMs === 1000 && sum[0].worstTotalMs === 2000)
 check('errors counted, never averaged in', sum[1].ok === 1 && sum[1].errors === 1 && sum[1].medTotalMs === 800)
 check('estimated runs flagged', sum[0].anyEstimated && !sum[1].anyEstimated)
 const allBad = summarizeRuns([bad])
 check('all-error server has no medians', allBad[0].medTtftMs === null && allBad[0].medTotalMs === null && allBad[0].bestTotalMs === null)
 check('run missing ttft excluded from median', summarizeRuns([r(1, 1, { ttftMs: null }), r(1, 2, { ttftMs: 90 })])[0].medTtftMs === 90)
+const thinker = summarizeRuns([r(3, 1, { ttftMs: 5000, firstMs: 200, totalMs: 6000, tokens: 58 })])
+check('thinking run rates from first streamed token', Math.abs(thinker[0].medTokPerSec - 10) < 1e-9)
+check('thinking run keeps its perceived TTFT in medians', thinker[0].medTtftMs === 5000)
 
 // ---------- history & clipping ----------
 check('clipText keeps short text intact', clipText('hello') === 'hello')

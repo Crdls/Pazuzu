@@ -145,7 +145,6 @@
     "maxTokens": "Max tokens",
     "model": "Model",
     "modelAuto": "Auto (engine default)",
-    "modelHelp": "Listed from the first selected engine; “Auto” sends no model field.",
     "run": "Run",
     "stop": "Stop",
     "emptyHint": "Select servers, type a prompt and press Run.",
@@ -174,7 +173,14 @@
     "toastRunFailed": "Could not start the run",
     "history": "History",
     "historyClear": "Clear history",
-    "hRuns": "{n} run|{n} runs"
+    "hRuns": "{n} run|{n} runs",
+    "thinking": "Thinking",
+    "thoughts": "Thoughts",
+    "reasoning": "Reasoning effort",
+    "reasonAuto": "Auto",
+    "reasonLow": "Low",
+    "reasonMedium": "Medium",
+    "reasonHigh": "High"
   },
   "settings": {
     "title": "Settings",

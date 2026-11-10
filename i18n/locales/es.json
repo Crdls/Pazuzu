@@ -145,7 +145,6 @@
     "maxTokens": "Tokens máx.",
     "model": "Modelo",
     "modelAuto": "Auto (modelo del motor)",
-    "modelHelp": "Lista leída del primer motor seleccionado; «Auto» no envía el campo model.",
     "run": "Ejecutar",
     "stop": "Detener",
     "emptyHint": "Selecciona servidores, escribe un prompt y pulsa Ejecutar.",
@@ -174,7 +173,14 @@
     "toastRunFailed": "No se pudo iniciar la ejecución",
     "history": "Historial",
     "historyClear": "Vaciar historial",
-    "hRuns": "{n} ejecución|{n} ejecuciones"
+    "hRuns": "{n} ejecución|{n} ejecuciones",
+    "thinking": "Pensando",
+    "thoughts": "Razonamiento",
+    "reasoning": "Nivel de razonamiento",
+    "reasonAuto": "Auto",
+    "reasonLow": "Bajo",
+    "reasonMedium": "Medio",
+    "reasonHigh": "Alto"
   },
   "settings": {
     "title": "Ajustes",

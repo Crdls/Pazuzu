@@ -13,8 +13,11 @@ export interface RunOutcome {
   /** 1-based run index within the server's sequence */
   run: number
   ok: boolean
-  /** ms until the first content delta; null when none ever arrived */
+  /** ms until the first answer delta; null when none ever arrived */
   ttftMs: number | null
+  /** ms until the first streamed token, reasoning included - the honest
+   *  start of the decode window for thinking models */
+  firstMs: number | null
   /** ms from request start to stream end */
   totalMs: number
   /** generated tokens (engine usage when reported, else chars/4 estimate) */
@@ -42,6 +45,8 @@ export interface ChatRunOptions {
   prompt: string
   temperature?: number | null
   maxTokens?: number | null
+  /** 'low' | 'medium' | 'high' - forwarded as OpenAI-style reasoning_effort */
+  reasoningEffort?: string | null
 }
 
 /** OpenAI-shaped streaming chat body with usage reporting requested. */
@@ -54,6 +59,7 @@ export function buildChatBody (opts: ChatRunOptions): string {
   if (opts.model) body.model = opts.model
   if (typeof opts.temperature === 'number') body.temperature = opts.temperature
   if (typeof opts.maxTokens === 'number') body.max_tokens = opts.maxTokens
+  if (opts.reasoningEffort) body.reasoning_effort = opts.reasoningEffort
   return JSON.stringify(body)
 }
 
@@ -94,6 +100,21 @@ export function deltaTextOf (chunk: unknown): string {
   return typeof content === 'string' ? content : ''
 }
 
+/** Reasoning ("thinking") text of one chunk - the side channel reasoning
+ *  models stream before the answer (reasoning_content, older: reasoning). */
+export function reasoningTextOf (chunk: unknown): string {
+  if (typeof chunk !== 'object' || chunk === null) return ''
+  const choices = (chunk as { choices?: unknown }).choices
+  if (!Array.isArray(choices) || choices.length === 0) return ''
+  const first = choices[0] as { delta?: unknown } | null
+  const delta = first && typeof first === 'object' ? first.delta : null
+  if (typeof delta !== 'object' || delta === null) return ''
+  const d = delta as { reasoning_content?: unknown, reasoning?: unknown }
+  if (typeof d.reasoning_content === 'string') return d.reasoning_content
+  if (typeof d.reasoning === 'string') return d.reasoning
+  return ''
+}
+
 /** `usage` of a parsed chunk (the final one carries it with include_usage). */
 export function usageFromChunk (chunk: unknown): TokenUsage | null {
   if (typeof chunk !== 'object' || chunk === null) return null
@@ -118,10 +139,16 @@ export function median (values: number[]): number | null {
   return sorted.length % 2 ? sorted[mid]! : (sorted[mid - 1]! + sorted[mid]!) / 2
 }
 
-/** Tokens per second over the run's whole duration (prefill included). */
-export function tokPerSecOf (tokens: number, totalMs: number): number | null {
-  if (totalMs <= 0) return null
-  return (tokens / totalMs) * 1000
+/**
+ * Generation tok/s: tokens over the time after the first token - TTFT is
+ * prefill/queueing, counting it into the rate crushes slow engines to zero.
+ * Falls back to the whole duration when the run never reported a TTFT.
+ */
+export function tokPerSecOf (tokens: number, totalMs: number, ttftMs: number | null = null): number | null {
+  let decodeMs = totalMs - (ttftMs ?? 0)
+  if (decodeMs < 50) decodeMs = totalMs // one-token runs: TTFT ~= total
+  if (decodeMs <= 0) return null
+  return (tokens / decodeMs) * 1000
 }
 
 /** Clip long streamed text for persistence: keeps head and tail around a marker. */
@@ -153,7 +180,7 @@ export function summarizeRuns (outcomes: RunOutcome[]): ServerSummary[] {
     const okRuns = list.filter(o => o.ok)
     const totals = okRuns.map(o => o.totalMs)
     const rates = okRuns
-      .map(o => tokPerSecOf(o.tokens, o.totalMs))
+      .map(o => tokPerSecOf(o.tokens, o.totalMs, o.firstMs ?? o.ttftMs))
       .filter((x): x is number => x != null)
     summaries.push({
       serverId,

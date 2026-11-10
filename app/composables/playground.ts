@@ -23,7 +23,11 @@ export interface RunState {
   run: number
   status: RunStatus
   text: string
+  /** reasoning side channel of thinking models (delta.reasoning_content) */
+  reasoning: string
   ttftMs: number | null
+  /** ms until the first streamed token, thinking included */
+  firstMs: number | null
   totalMs: number | null
   tokens: number | null
   estimated: boolean
@@ -64,6 +68,8 @@ export interface FormState {
   temperature: number | null
   maxTokens: number | null
   model: string
+  /** 'auto' sends no reasoning_effort field */
+  reasoning: string
 }
 
 export interface HistoryEntry {
@@ -75,6 +81,7 @@ export interface HistoryEntry {
   temperature: number | null
   maxTokens: number | null
   model: string
+  reasoning?: string
 }
 
 // one-per-tab singletons: the reader loop and its timers must outlive the page
@@ -105,7 +112,7 @@ export function usePlayground () {
   const toast = useToast()
 
   const form = useState<FormState>('playground-form', () => ({
-    prompt: '', serverIds: [], runs: 1, temperature: 0.7, maxTokens: 256, model: MODEL_AUTO
+    prompt: '', serverIds: [], runs: 1, temperature: 0.7, maxTokens: 256, model: MODEL_AUTO, reasoning: 'auto'
   }))
   const batch = useState<Batch | null>('playground-batch', () => null)
   const summary = useState<SummaryRow[] | null>('playground-summary', () => null)
@@ -117,7 +124,13 @@ export function usePlayground () {
   // ---------- localStorage mirror ----------
   function serializeBatch (b: Batch | null): Batch | null {
     if (!b) return null
-    return { ...b, servers: b.servers.map(s => ({ ...s, runs: s.runs.map(r => ({ ...r, text: clipText(r.text, TEXT_CAP) })) })) }
+    return {
+      ...b,
+      servers: b.servers.map(s => ({
+        ...s,
+        runs: s.runs.map(r => ({ ...r, text: clipText(r.text, TEXT_CAP), reasoning: clipText(r.reasoning ?? '', TEXT_CAP) }))
+      }))
+    }
   }
 
   function persist () {
@@ -185,7 +198,9 @@ export function usePlayground () {
       run,
       status: 'queued',
       text: '',
+      reasoning: '',
       ttftMs: null,
+      firstMs: null,
       totalMs: null,
       tokens: null,
       estimated: false,
@@ -197,7 +212,7 @@ export function usePlayground () {
 
   // JSON keeps the history key unambiguous: prompts contain any plain separator
   function historyKey (h: HistoryEntry): string {
-    return JSON.stringify([h.prompt, h.model, h.runs, h.temperature, h.maxTokens, [...h.serverIds].sort((a, b) => a - b)])
+    return JSON.stringify([h.prompt, h.model, h.runs, h.temperature, h.maxTokens, h.reasoning ?? 'auto', [...h.serverIds].sort((a, b) => a - b)])
   }
 
   function runOf (serverId: number, run: number): RunState | undefined {
@@ -210,8 +225,17 @@ export function usePlayground () {
       case 'start':
         if (run) { run.status = 'running'; run.startedAt = Date.now() }
         break
+      case 'firstReasoning':
+        if (run) run.firstMs = Number(ev.ms)
+        break
+      case 'reasoning':
+        if (run) run.reasoning += String(ev.text ?? '')
+        break
       case 'firstToken':
-        if (run) run.ttftMs = Number(ev.ttftMs)
+        if (run) {
+          run.ttftMs = Number(ev.ttftMs)
+          if (run.firstMs == null) run.firstMs = Number(ev.ttftMs)
+        }
         break
       case 'delta':
         if (run) run.text += String(ev.text ?? '')
@@ -219,6 +243,8 @@ export function usePlayground () {
       case 'done':
         if (run) {
           run.status = 'done'
+          run.ttftMs = ev.ttftMs === null || ev.ttftMs === undefined ? null : Number(ev.ttftMs)
+          run.firstMs = ev.firstMs === null || ev.firstMs === undefined ? null : Number(ev.firstMs)
           run.totalMs = Number(ev.totalMs)
           run.tokens = Number(ev.tokens)
           run.estimated = Boolean(ev.estimated)
@@ -265,7 +291,8 @@ export function usePlayground () {
       runs: form.value.runs,
       ...(form.value.model !== MODEL_AUTO ? { model: form.value.model } : {}),
       ...(typeof form.value.temperature === 'number' ? { temperature: form.value.temperature } : {}),
-      ...(typeof form.value.maxTokens === 'number' ? { maxTokens: form.value.maxTokens } : {})
+      ...(typeof form.value.maxTokens === 'number' ? { maxTokens: form.value.maxTokens } : {}),
+      ...(form.value.reasoning !== 'auto' ? { reasoningEffort: form.value.reasoning } : {})
     }
     batch.value = {
       startedAt: Date.now(),
@@ -281,7 +308,8 @@ export function usePlayground () {
       runs: form.value.runs,
       temperature: form.value.temperature,
       maxTokens: form.value.maxTokens,
-      model: form.value.model
+      model: form.value.model,
+      reasoning: form.value.reasoning
     }
     history.value = pushHistory(history.value, entry, historyKey, HISTORY_LIMIT)
     persist()
@@ -351,7 +379,8 @@ export function usePlayground () {
       runs: h.runs,
       temperature: h.temperature,
       maxTokens: h.maxTokens,
-      model: h.model
+      model: h.model,
+      reasoning: h.reasoning ?? 'auto'
     }
   }
 

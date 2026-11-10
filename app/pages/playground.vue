@@ -41,6 +41,13 @@ const modelItems = computed(() => [
   ...models.value.map(m => ({ label: m, value: m }))
 ])
 
+const reasoningItems = computed(() => [
+  { label: t('playground.reasonAuto'), value: 'auto' },
+  { label: t('playground.reasonLow'), value: 'low' },
+  { label: t('playground.reasonMedium'), value: 'medium' },
+  { label: t('playground.reasonHigh'), value: 'high' }
+])
+
 function startRun () {
   void pg.start((serverOptions.value ?? []).filter(s => form.value.serverIds.includes(s.id)))
 }
@@ -79,12 +86,21 @@ function liveTotalMs (r: RunState): number | null {
   if (r.startedAt == null) return null
   return (r.finishedAt ?? Date.now()) - r.startedAt
 }
-/** Live tok/s: engine usage when known, else the chars/4 estimate so far. */
+/** Tokens so far: the estimate covers the reasoning channel too. */
+function estTokens (r: RunState): number {
+  return Math.round((r.text.length + (r.reasoning?.length ?? 0)) / 4)
+}
+/** Live tok/s: tokens over the time since the first streamed token (thinking
+ *  included) - TTFT belongs to "total", counting it in crushes the rate. */
 function liveRate (r: RunState): number | null {
-  const total = r.totalMs ?? liveTotalMs(r)
-  const tokens = r.tokens ?? Math.round(r.text.length / 4)
-  if (!total || !tokens) return null
-  return (tokens / total) * 1000
+  void tick.value
+  const firstMs = r.firstMs ?? r.ttftMs
+  if (r.startedAt == null || firstMs == null) return null // nothing generated yet
+  const wall = r.totalMs ?? Date.now() - r.startedAt
+  const decodeMs = wall - firstMs
+  const tokens = r.tokens ?? estTokens(r)
+  if (decodeMs < 50 || !tokens) return null
+  return (tokens / decodeMs) * 1000
 }
 function finishedCount (st: ServerState): number {
   return st.runs.filter(r => r.status !== 'queued' && r.status !== 'running').length
@@ -104,6 +120,11 @@ const runStatusKeys: Record<RunStatus, string> = {
   error: 'playground.error',
   aborted: 'playground.aborted',
   skipped: 'playground.skipped'
+}
+/** A run streaming thoughts but no answer token yet is thinking, not silent. */
+function statusKey (r: RunState): string {
+  if (r.status === 'running' && r.ttftMs == null && (r.reasoning?.length ?? 0) > 0) return 'playground.thinking'
+  return runStatusKeys[r.status]
 }
 function runStatusColor (s: RunStatus): 'success' | 'error' | 'primary' | 'neutral' {
   return s === 'done' ? 'success' : s === 'error' ? 'error' : s === 'running' ? 'primary' : 'neutral'
@@ -212,8 +233,11 @@ const runLog = computed(() => (batch.value?.servers ?? []).flatMap(st =>
           <UFormField :label="t('playground.maxTokens')">
             <UInputNumber v-model="form.maxTokens" :min="1" :max="16384" :step="1" :disabled="running" class="w-28" />
           </UFormField>
-          <UFormField :label="t('playground.model')" :help="t('playground.modelHelp')">
+          <UFormField :label="t('playground.model')">
             <USelect v-model="form.model" :items="modelItems" :disabled="running" class="w-56" />
+          </UFormField>
+          <UFormField :label="t('playground.reasoning')">
+            <USelect v-model="form.reasoning" :items="reasoningItems" :disabled="running" class="w-40" />
           </UFormField>
           <div class="ml-auto flex items-center gap-2">
             <UButton
@@ -255,7 +279,7 @@ const runLog = computed(() => (batch.value?.servers ?? []).flatMap(st =>
           </UBadge>
           <UTooltip v-if="activeRun(st).status === 'running' || activeRun(st).estimated" :text="t('playground.tokensEstimate')">
             <UBadge color="neutral" variant="subtle" size="sm" class="tabular-nums">
-              ≈{{ activeRun(st).tokens ?? Math.round(activeRun(st).text.length / 4) }} {{ t('playground.tokens') }}
+              ≈{{ activeRun(st).tokens ?? estTokens(activeRun(st)) }} {{ t('playground.tokens') }}
             </UBadge>
           </UTooltip>
           <UTooltip v-else :text="t('playground.tokens')">
@@ -265,17 +289,26 @@ const runLog = computed(() => (batch.value?.servers ?? []).flatMap(st =>
           </UTooltip>
         </div>
 
+        <!-- the thinking channel of reasoning models: what the long TTFT spent doing -->
+        <div v-if="activeRun(st).reasoning" class="rounded-md bg-elevated/60 p-2 space-y-1">
+          <div class="flex items-center gap-1 text-[10px] uppercase tracking-wide text-dimmed">
+            <UIcon name="i-lucide-brain" class="size-3" />
+            {{ t('playground.thoughts') }}
+          </div>
+          <div class="text-xs leading-4 font-mono whitespace-pre-wrap break-words text-muted max-h-40 overflow-y-auto">{{ activeRun(st).reasoning }}</div>
+        </div>
+
         <div class="text-[13px] leading-5 font-mono whitespace-pre-wrap break-words max-h-64 overflow-y-auto">
           <span v-if="activeRun(st).text">{{ activeRun(st).text }}</span>
           <span v-else-if="activeRun(st).error" class="text-error text-xs">{{ activeRun(st).error }}</span>
-          <span v-else class="text-dimmed text-xs">{{ t(runStatusKeys[activeRun(st).status]) }}</span>
+          <span v-else class="text-dimmed text-xs">{{ t(statusKey(activeRun(st))) }}</span>
         </div>
 
         <div class="flex flex-wrap gap-1">
           <UTooltip
             v-for="r in st.runs"
             :key="r.run"
-            :text="`#${r.run} · ${t(runStatusKeys[r.status])} · ${t('playground.ttft')} ${fmtMs(r.ttftMs)} · ${fmtMs(r.totalMs ?? liveTotalMs(r))} · ${fmtRate(liveRate(r))} ${t('playground.tokPerSec')}`"
+            :text="`#${r.run} · ${t(statusKey(r))} · ${t('playground.ttft')} ${fmtMs(r.ttftMs)} · ${fmtMs(r.totalMs ?? liveTotalMs(r))} · ${fmtRate(liveRate(r))} ${t('playground.tokPerSec')}`"
           >
             <span
               class="inline-flex items-center justify-center size-5 rounded text-[10px] tabular-nums cursor-default"
@@ -348,14 +381,14 @@ const runLog = computed(() => (batch.value?.servers ?? []).flatMap(st =>
             <td class="py-2 pr-3 text-right tabular-nums">{{ r.run }}</td>
             <td class="py-2 pr-3">
               <UBadge :color="runStatusColor(r.status)" variant="subtle" size="sm" :title="r.error ?? undefined">
-                {{ t(runStatusKeys[r.status]) }}
+                {{ t(statusKey(r)) }}
               </UBadge>
             </td>
             <td class="py-2 pr-3 text-right tabular-nums">{{ fmtMs(r.ttftMs) }}</td>
             <td class="py-2 pr-3 text-right tabular-nums">{{ fmtMs(r.totalMs ?? liveTotalMs(r)) }}</td>
             <td class="py-2 pr-3 text-right tabular-nums">
               <span :title="r.estimated ? t('playground.tokensEstimate') : undefined">
-                {{ r.estimated ? '≈' : '' }}{{ r.tokens ?? Math.round(r.text.length / 4) }}
+                {{ r.estimated ? '≈' : '' }}{{ r.tokens ?? estTokens(r) }}
               </span>
             </td>
             <td class="py-2 font-medium text-right tabular-nums">{{ fmtRate(liveRate(r)) }}</td>

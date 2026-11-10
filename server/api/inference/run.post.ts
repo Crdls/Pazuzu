@@ -1,7 +1,7 @@
 import { useDb, type ServerRow } from '../../utils/db'
 import { upstreamUrl } from '../../utils/gateway/proxy'
 import {
-  buildChatBody, deltaTextOf, estimateTokens, splitSseFrames, summarizeRuns, usageFromChunk,
+  buildChatBody, deltaTextOf, estimateTokens, reasoningTextOf, splitSseFrames, summarizeRuns, usageFromChunk,
   type RunOutcome
 } from '../../utils/inference'
 
@@ -9,7 +9,10 @@ import {
  * POST /api/inference/run — the Playground's multiplexed test run.
  * Sends one prompt to several engines at once (runs sequential per server,
  * servers in parallel) and streams every answer plus its timings back as a
- * single SSE feed: {type: start|firstToken|delta|done|error|summary|end}.
+ * single SSE feed: {type: start|firstReasoning|reasoning|firstToken|delta|
+ * done|error|summary|end}. Reasoning models stream their thinking into a
+ * side channel (delta.reasoning_content) - it is relayed as its own events,
+ * so "thinking" stays visible instead of looking like a dead pause.
  * Session-gated like the rest of /api; no role requirement beyond that.
  */
 
@@ -27,14 +30,17 @@ interface RunRequestBody {
   model?: unknown
   temperature?: unknown
   maxTokens?: unknown
+  reasoningEffort?: unknown
 }
+
+const REASONING_EFFORTS = ['low', 'medium', 'high']
 
 function describeError (err: unknown): string {
   if (err instanceof Error) return err.message || err.name
   return String(err)
 }
 
-function parseOptions (body: RunRequestBody | null): { ids: number[], prompt: string, runs: number, model: string | null, temperature: number | null, maxTokens: number | null } {
+function parseOptions (body: RunRequestBody | null): { ids: number[], prompt: string, runs: number, model: string | null, temperature: number | null, maxTokens: number | null, reasoningEffort: string | null } {
   const ids = Array.isArray(body?.serverIds)
     ? [...new Set(body!.serverIds as unknown[])]
       .filter((x): x is number => typeof x === 'number' && Number.isInteger(x) && x > 0)
@@ -59,21 +65,28 @@ function parseOptions (body: RunRequestBody | null): { ids: number[], prompt: st
   if (maxTokens !== null && (!Number.isInteger(maxTokens) || maxTokens < 1 || maxTokens > 16384)) {
     throw createError({ statusCode: 400, statusMessage: 'maxTokens must be 1-16384' })
   }
-  return { ids: ids as number[], prompt, runs, model, temperature, maxTokens }
+  const reasoningEffort = body?.reasoningEffort === undefined || body.reasoningEffort === null || body.reasoningEffort === '' ? null
+    : String(body.reasoningEffort).trim().toLowerCase()
+  if (reasoningEffort !== null && !REASONING_EFFORTS.includes(reasoningEffort)) {
+    throw createError({ statusCode: 400, statusMessage: 'reasoningEffort must be low|medium|high' })
+  }
+  return { ids: ids as number[], prompt, runs, model, temperature, maxTokens, reasoningEffort }
 }
 
 /** One run against one engine; sends its own done/error event and returns the timing. */
 async function runOnce (
   server: ServerRow,
   run: number,
-  opts: { prompt: string, model: string | null, temperature: number | null, maxTokens: number | null },
+  opts: { prompt: string, model: string | null, temperature: number | null, maxTokens: number | null, reasoningEffort: string | null },
   send: (obj: Record<string, unknown>) => void,
   signal: AbortSignal
 ): Promise<RunOutcome> {
   const base = { serverId: server.id, run }
   const t0 = Date.now()
   let ttftMs: number | null = null
+  let firstMs: number | null = null
   let chars = 0
+  let reasoningChars = 0
   let genTokens: number | null = null
   try {
     const res = await fetch(upstreamUrl(server, '/v1/chat/completions', ''), {
@@ -90,7 +103,7 @@ async function runOnce (
       try { snippet = (await res.text()).slice(0, 300) } catch { /* the status alone is enough */ }
       const error = `HTTP ${res.status}${snippet ? `: ${snippet}` : ''}`
       if (!signal.aborted) send({ type: 'error', ...base, error })
-      return { ...base, ok: false, error, ttftMs: null, totalMs: Date.now() - t0, tokens: 0, estimated: false }
+      return { ...base, ok: false, error, ttftMs: null, firstMs: null, totalMs: Date.now() - t0, tokens: 0, estimated: false }
     }
     const reader = res.body.getReader()
     const decoder = new TextDecoder()
@@ -107,10 +120,20 @@ async function runOnce (
         try { chunk = JSON.parse(data) } catch { continue } // engine chatter / invalid frame
         const usage = usageFromChunk(chunk)
         if (usage) genTokens = usage.gen
+        const reasoning = reasoningTextOf(chunk)
+        if (reasoning) {
+          if (firstMs === null) {
+            firstMs = Date.now() - t0
+            send({ type: 'firstReasoning', ...base, ms: firstMs })
+          }
+          reasoningChars += reasoning.length
+          send({ type: 'reasoning', ...base, text: reasoning })
+        }
         const text = deltaTextOf(chunk)
         if (!text) continue
         if (ttftMs === null) {
           ttftMs = Date.now() - t0
+          if (firstMs === null) firstMs = ttftMs
           send({ type: 'firstToken', ...base, ttftMs })
         }
         chars += text.length
@@ -118,14 +141,14 @@ async function runOnce (
       }
     }
     const totalMs = Date.now() - t0
-    const tokens = genTokens ?? estimateTokens(chars)
+    const tokens = genTokens ?? estimateTokens(chars + reasoningChars)
     const estimated = genTokens === null
-    if (!signal.aborted) send({ type: 'done', ...base, ttftMs, totalMs, tokens, estimated })
-    return { ...base, ok: true, ttftMs, totalMs, tokens, estimated }
+    if (!signal.aborted) send({ type: 'done', ...base, ttftMs, firstMs, totalMs, tokens, estimated })
+    return { ...base, ok: true, ttftMs, firstMs, totalMs, tokens, estimated }
   } catch (err) {
     const error = describeError(err)
     if (!signal.aborted) send({ type: 'error', ...base, error })
-    return { ...base, ok: false, error, ttftMs, totalMs: Date.now() - t0, tokens: 0, estimated: false }
+    return { ...base, ok: false, error, ttftMs, firstMs, totalMs: Date.now() - t0, tokens: 0, estimated: false }
   }
 }
 

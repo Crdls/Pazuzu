@@ -145,7 +145,6 @@
     "maxTokens": "最大 Token",
     "model": "模型",
     "modelAuto": "自动（引擎默认模型）",
-    "modelHelp": "模型列表来自第一个所选引擎；“自动”不发送 model 字段。",
     "run": "运行",
     "stop": "停止",
     "emptyHint": "选择服务器、输入提示词，然后点击“运行”。",
@@ -174,7 +173,14 @@
     "toastRunFailed": "无法启动运行",
     "history": "历史记录",
     "historyClear": "清空历史",
-    "hRuns": "{n} 次"
+    "hRuns": "{n} 次",
+    "thinking": "思考中",
+    "thoughts": "思考过程",
+    "reasoning": "推理强度",
+    "reasonAuto": "自动",
+    "reasonLow": "低",
+    "reasonMedium": "中",
+    "reasonHigh": "高"
   },
   "settings": {
     "title": "设置",
