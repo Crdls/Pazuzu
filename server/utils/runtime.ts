@@ -39,6 +39,9 @@ interface Runtime {
   authFails: Map<string, { fails: number, last: number }>
   /** pending GitLab OAuth state nonce -> expiry ts (ms) */
   gitlabStates: Map<string, number>
+  /** clients connected to /_ws; the ws route registers them here so
+   * broadcast() can push without a nitro publisher API (none in nitro 2.x) */
+  wsPeers: Set<{ send: (msg: unknown) => unknown }>
   /** gateway/limiter state, lazily created by gateway/state.ts */
   gateway?: GatewayRuntime
   /** version check/update state, see server/utils/update.ts */
@@ -120,13 +123,15 @@ export function runtime (): Runtime {
       prevGen: new Map(),
       scraping: false,
       authFails: new Map(),
-      gitlabStates: new Map()
+      gitlabStates: new Map(),
+      wsPeers: new Set()
     }
   }
   const rt = g.__pazuzu
   // a global created by an older module version (dev HMR) may miss newer fields
   if (!rt.authFails) rt.authFails = new Map()
   if (!rt.gitlabStates) rt.gitlabStates = new Map()
+  if (!rt.wsPeers) rt.wsPeers = new Set()
   if (!rt.engineStart) rt.engineStart = new Map()
   if (!rt.prevGen) rt.prevGen = new Map()
   if (!rt.gateway) {

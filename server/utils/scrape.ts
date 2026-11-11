@@ -205,10 +205,16 @@ export async function scrapeServer (server: ServerRow): Promise<Snapshot> {
 }
 
 export function broadcast (msg: unknown) {
-  try {
-    useWebSocket().publish(msg)
-  } catch {
-    // websocket layer not ready yet - clients fall back to polling
+  // push to the peers registered by the /_ws route (nitro 2.x has no
+  // publisher API); a failing send means the socket died without a close
+  // event - drop that peer, the browser reconnects on its own
+  const peers = runtime().wsPeers
+  for (const peer of [...peers]) {
+    try {
+      peer.send(msg)
+    } catch {
+      peers.delete(peer)
+    }
   }
 }
 

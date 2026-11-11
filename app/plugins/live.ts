@@ -36,6 +36,9 @@ export default defineNuxtPlugin(() => {
   let ws: WebSocket | null = null
   let reconnectTimer: ReturnType<typeof setTimeout> | undefined
   let pollTimer: ReturnType<typeof setInterval> | undefined
+  // ts of the last WS message - an open-but-silent socket (half-open proxy)
+  // must not block the HTTP fallback
+  let lastPush = 0
 
   function isUnauthorized (err: unknown) {
     const e = err as { statusCode?: number, status?: number }
@@ -74,6 +77,7 @@ export default defineNuxtPlugin(() => {
       void refresh()
     }
     ws.onmessage = (ev) => {
+      lastPush = Date.now()
       try {
         const msg = JSON.parse(String(ev.data))
         if (msg.type === 'snapshot') applySnapshot(msg.snapshot as LiveSnapshot)
@@ -96,8 +100,11 @@ export default defineNuxtPlugin(() => {
   onNuxtReady(async () => {
     await refresh()
     connect()
-    // safety net in case the websocket is blocked by a proxy
-    pollTimer = setInterval(() => { if (!connected.value) void refresh() }, 5000)
+    // safety net for a blocked or half-open websocket: while no push arrived
+    // for a while, pull the snapshots over HTTP
+    pollTimer = setInterval(() => {
+      if (!connected.value || Date.now() - lastPush > 15_000) void refresh()
+    }, 5000)
   })
 
   if (import.meta.client) {

@@ -1,11 +1,11 @@
-// thin space as the digit-group separator (not commas, everywhere)
-const THIN_SPACE = '\u202F'
+// no-break space as the digit-group separator (not commas, everywhere)
+const NB_SPACE = '\u00A0'
 
-/** Group digit triples with thin spaces: `262 144`, `1 234.5`. */
+/** Group digit triples with non-break spaces: `262 144`, `1 234.5`. */
 export function groupNum (v: number | null | undefined, digits = 0): string {
   if (v === null || v === undefined || !Number.isFinite(v)) return '—'
   const [int, frac] = Math.abs(v).toFixed(digits).split('.')
-  const g = int.replace(/\B(?=(\d{3})+(?!\d))/g, THIN_SPACE)
+  const g = int.replace(/\B(?=(\d{3})+(?!\d))/g, NB_SPACE)
   return (v < 0 ? '-' : '') + g + (frac ? `.${frac}` : '')
 }
 
