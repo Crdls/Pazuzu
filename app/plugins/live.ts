@@ -9,6 +9,8 @@ export interface LiveSnapshot {
   lastSeen?: number | null
   /** last scrape ts (ms) with requests running/waiting; null = never busy */
   lastBusy?: number | null
+  /** engine (re)start ts (ms) from generation-counter resets; null = never observed */
+  engineStart?: number | null
 }
 
 export interface LiveServer {

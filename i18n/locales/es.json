@@ -31,7 +31,9 @@
     "title": "Panel",
     "emptyTitle": "Aún no hay servidores",
     "emptyText": "Añade un motor Strata por su URL base (p. ej. http://192.168.10.76:8000) — las métricas se leen de /metrics.",
-    "cta": "Añadir el primer servidor"
+    "cta": "Añadir el primer servidor",
+    "updated": "actualizado: {v}",
+    "refresh": "actualizar"
   },
   "state": {
     "unloaded": "Descargado",
@@ -42,14 +44,17 @@
     "disabled": "Desactivado"
   },
   "card": {
-    "running": "activos",
+    "requests": "en curso",
+    "requestsHint": "en curso + en cola de espera",
     "queued": "en cola",
     "kvCache": "KV caché",
     "cpu": "CPU",
     "ram": "RAM",
     "hit": "acierto {v}%",
-    "req": "req {n}",
-    "gen": "gen {n} tok",
+    "total": "{n} tok en total",
+    "up": "iniciado {v}",
+    "temp": "temp",
+    "power": "potencia",
     "disabled": "El servidor está desactivado",
     "waiting": "Esperando el primer sondeo…",
     "load": "carga {v}",

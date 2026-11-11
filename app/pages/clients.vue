@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import type { GatewayClientView } from '~~/server/utils/gateway/view'
+import { groupNum } from '../utils/format'
 
 interface GatewayServerStatus {
   id: number
@@ -390,7 +391,7 @@ function priorityColor (p: string): 'error' | 'primary' | 'neutral' {
             <td class="py-2.5 pr-3 text-right tabular-nums">{{ client.requestsToday }}</td>
             <td class="py-2.5 pr-3 text-right tabular-nums">{{ client.requestsTotal }}</td>
             <td class="py-2.5 pr-3 text-right tabular-nums text-muted" :title="t('clients.tokensHelp')">
-              ~{{ client.tokensTotal.toLocaleString() }}
+              ~{{ groupNum(client.tokensTotal) }}
             </td>
             <td class="py-2.5 pr-3 text-muted whitespace-nowrap">{{ fmtTime(client.createdAt) }}</td>
             <td class="py-2.5 text-right whitespace-nowrap">

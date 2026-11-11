@@ -31,7 +31,9 @@
     "title": "仪表盘",
     "emptyTitle": "暂无服务器",
     "emptyText": "通过基础 URL 添加 Strata 引擎（如 http://192.168.10.76:8000），指标从 /metrics 读取。",
-    "cta": "添加第一台服务器"
+    "cta": "添加第一台服务器",
+    "updated": "更新于 {v}",
+    "refresh": "刷新"
   },
   "state": {
     "unloaded": "未加载",
@@ -42,14 +44,17 @@
     "disabled": "已禁用"
   },
   "card": {
-    "running": "运行中",
+    "requests": "处理中",
+    "requestsHint": "执行中 + 排队等待",
     "queued": "排队中",
     "kvCache": "KV 缓存",
     "cpu": "CPU",
     "ram": "内存",
     "hit": "命中率 {v}%",
-    "req": "请求 {n}",
-    "gen": "生成 {n} tok",
+    "total": "共 {n} tok",
+    "up": "启动于 {v}",
+    "temp": "温度",
+    "power": "功耗",
     "disabled": "服务器已禁用",
     "waiting": "等待首次采集…",
     "load": "负载 {v}",

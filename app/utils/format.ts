@@ -1,7 +1,24 @@
+// thin space as the digit-group separator (not commas, everywhere)
+const THIN_SPACE = '\u202F'
+
+/** Group digit triples with thin spaces: `262 144`, `1 234.5`. */
+export function groupNum (v: number | null | undefined, digits = 0): string {
+  if (v === null || v === undefined || !Number.isFinite(v)) return '—'
+  const [int, frac] = Math.abs(v).toFixed(digits).split('.')
+  const g = int.replace(/\B(?=(\d{3})+(?!\d))/g, THIN_SPACE)
+  return (v < 0 ? '-' : '') + g + (frac ? `.${frac}` : '')
+}
+
+/** Thousands-sized count (token pools, engine contexts) without a suffix. */
+export function kVal (v: number | null | undefined): string {
+  if (v === null || v === undefined || !Number.isFinite(v)) return '—'
+  return groupNum(Math.round(v / 1000))
+}
+
 export function fmtNum (v: number | null | undefined, digits = 1): string {
   if (v === null || v === undefined || !Number.isFinite(v)) return '—'
   const abs = Math.abs(v)
-  if (abs >= 10_000) return Math.round(v).toLocaleString('en-US')
+  if (abs >= 10_000) return groupNum(v)
   if (abs >= 100) return v.toFixed(0)
   if (abs >= 10) return v.toFixed(Math.max(0, digits - 1))
   return v.toFixed(digits)
@@ -23,6 +40,18 @@ export function fmtClock (ts: number): string {
   return new Date(ts).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })
 }
 
+/** Local calendar date as `dd.mm.yy` (dotted, 2-digit year), e.g. `05.11.26`. */
+export function fmtDate (ts: number): string {
+  const d = new Date(ts)
+  const p = (n: number) => String(n).padStart(2, '0')
+  return `${p(d.getDate())}.${p(d.getMonth() + 1)}.${p(d.getFullYear() % 100)}`
+}
+
+/** Local timestamp as `dd.mm.yy hh:mm`, e.g. `09.11.26 08:14`. */
+export function fmtStamp (ts: number): string {
+  return `${fmtDate(ts)} ${new Date(ts).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })}`
+}
+
 export function fmtDateTime (ts: number): string {
   return new Date(ts).toLocaleString('en-GB', {
     day: '2-digit',
@@ -34,7 +63,7 @@ export function fmtDateTime (ts: number): string {
 
 /**
  * "X ago" label for last-seen/last-busy stamps: minutes below an hour,
- * hours+minutes up to 4 h, plain date-time beyond that. `t` is the i18n
+ * hours+minutes up to 4 h, plain date (`dd.mm.yy`) beyond that. `t` is the i18n
  * translate function (ago.* keys).
  */
 export function relTime (
@@ -47,7 +76,7 @@ export function relTime (
   if (min < 60) return t('ago.minutes', { n: min })
   const h = Math.floor(min / 60)
   if (h < 4) return t('ago.hoursMinutes', { h, m: min % 60 })
-  return fmtDateTime(ts)
+  return fmtDate(ts)
 }
 
 /** `gpu=0,model_name=x` -> { gpu: '0', model_name: 'x' } */

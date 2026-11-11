@@ -31,7 +31,9 @@
     "title": "Tableau de bord",
     "emptyTitle": "Aucun serveur pour l'instant",
     "emptyText": "Ajoutez un moteur Strata par son URL de base (ex. http://192.168.10.76:8000) — les métriques sont lues depuis /metrics.",
-    "cta": "Ajouter le premier serveur"
+    "cta": "Ajouter le premier serveur",
+    "updated": "mis à jour : {v}",
+    "refresh": "actualiser"
   },
   "state": {
     "unloaded": "Déchargé",
@@ -42,14 +44,17 @@
     "disabled": "Désactivé"
   },
   "card": {
-    "running": "en cours",
+    "requests": "en cours",
+    "requestsHint": "en cours + en file d'attente",
     "queued": "en file",
     "kvCache": "Cache KV",
     "cpu": "CPU",
     "ram": "RAM",
     "hit": "réussite {v} %",
-    "req": "req {n}",
-    "gen": "gén. {n} tok",
+    "total": "{n} tok au total",
+    "up": "démarré {v}",
+    "temp": "temp",
+    "power": "puissance",
     "disabled": "Le serveur est désactivé",
     "waiting": "En attente du premier sondage…",
     "load": "charge {v}",

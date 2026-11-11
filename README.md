@@ -19,11 +19,14 @@ that load-balances application calls across all your engines.
   An optional API key is sent as a `Bearer` token — newer Strata versions
   require it when the server is exposed to the network. The **Test** button
   checks right away that the engine is reachable and its `/metrics` parses.
-- **Live dashboard** — engine state (idle / reading / generating),
-  tok/s, queues, KV cache, per GPU: util / VRAM / temperature / power,
-  plus host CPU and RAM. Each card shows when the engine last had load and,
-  when it is unreachable, when it last answered ("1 h 5 min ago"; beyond
-  4 h an absolute date-time). Updates over WebSocket with a polling fallback.
+- **Live dashboard** — per-server cards: an engine state plate
+  (idle / reading / generating) with live tok/s, host CPU and RAM, KV cache
+  (% and tokens used/total), requests in progress (`+N` waiting), per GPU:
+  util / VRAM / temperature / power. Each card shows when the engine last
+  had load and, when it is unreachable, when it last answered
+  ("1 h 5 min ago"; beyond 4 h an absolute date-time). The header keeps an
+  "updated" stamp and a Refresh button that forces an immediate scrape;
+  live updates ride a WebSocket with a polling fallback.
 - **History** — charts per server for 1h / 6h / 24h / 7d / 30d.
 - **Heatmap** — load of all servers by time buckets, periods of
   1h / 3h / 12h / 24h / 7d / 30d / year, selectable metric (GPU util, CPU, tok/s,

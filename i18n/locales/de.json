@@ -31,7 +31,9 @@
     "title": "Übersicht",
     "emptyTitle": "Noch keine Server",
     "emptyText": "Strata-Engine über ihre Basis-URL hinzufügen (z. B. http://192.168.10.76:8000) — Metriken werden von /metrics gelesen.",
-    "cta": "Ersten Server hinzufügen"
+    "cta": "Ersten Server hinzufügen",
+    "updated": "aktualisiert: {v}",
+    "refresh": "Aktualisieren"
   },
   "state": {
     "unloaded": "Entladen",
@@ -42,14 +44,17 @@
     "disabled": "Deaktiviert"
   },
   "card": {
-    "running": "aktiv",
+    "requests": "aktiv",
+    "requestsHint": "aktiv + in Warteschlange",
     "queued": "wartend",
     "kvCache": "KV-Cache",
     "cpu": "CPU",
     "ram": "RAM",
     "hit": "Treffer {v} %",
-    "req": "Anfr. {n}",
-    "gen": "gen. {n} Tok.",
+    "total": "gesamt {n} Tok.",
+    "up": "Start {v}",
+    "temp": "Temp",
+    "power": "Leistung",
     "disabled": "Server ist deaktiviert",
     "waiting": "Warte auf ersten Durchlauf…",
     "load": "Last {v}",

@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import { groupNum } from '../utils/format'
+
 // database maintenance: size and row counts plus the manual cleanup button
 // (rollups + full thinning + VACUUM) - superadmin-only, like the config card
 interface StorageStats {
@@ -27,11 +29,11 @@ const { data: stats, refresh } = useFetch<StorageStats>('/api/storage', { immedi
 if (canManageStorage.value) refresh()
 
 function mb (bytes: number): string {
-  return (bytes / 1024 / 1024).toLocaleString('en-US', { maximumFractionDigits: 1 })
+  return groupNum(bytes / 1024 / 1024, 1)
 }
 
 function num (n: number): string {
-  return n.toLocaleString('en-US')
+  return groupNum(n)
 }
 
 const cleaning = ref(false)

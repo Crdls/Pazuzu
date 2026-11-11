@@ -121,6 +121,38 @@ function groupRows (rows: Array<[string, string, number]>): Record<string, Array
   return out
 }
 
+/**
+ * Engine (re)start tracking: `vllm:generation_tokens_total` only ever drops
+ * when the engine restarts (counters reset), so the first drop marks the
+ * start. The ts lives in the settings table (like the thin cursors) so it
+ * survives Pazuzu restarts; before a restart is ever observed it is null.
+ */
+function engineStartTs (serverId: number, rows: Array<[string, string, number]>, now: number): number | null {
+  const rt = runtime()
+  let cur: number | null = null
+  for (const [metric, , value] of rows) {
+    if (metric === 'vllm:generation_tokens_total') cur = (cur ?? 0) + value
+  }
+  if (cur !== null) {
+    const prev = rt.prevGen.get(serverId)
+    if (prev !== undefined && cur < prev) {
+      rt.engineStart.set(serverId, now)
+      useDb()
+        .prepare('INSERT INTO settings (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value')
+        .run(`engine_start:${serverId}`, String(now))
+    }
+    rt.prevGen.set(serverId, cur)
+  }
+  if (!rt.engineStart.has(serverId)) {
+    const stored = useDb()
+      .prepare('SELECT value FROM settings WHERE key = ?')
+      .get(`engine_start:${serverId}`) as { value: string } | undefined
+    const ts = Number(stored?.value)
+    if (stored !== undefined && Number.isFinite(ts)) rt.engineStart.set(serverId, ts)
+  }
+  return rt.engineStart.get(serverId) ?? null
+}
+
 export async function scrapeServer (server: ServerRow): Promise<Snapshot> {
   const rt = runtime()
   const now = Date.now()
@@ -147,7 +179,8 @@ export async function scrapeServer (server: ServerRow): Promise<Snapshot> {
       up: true,
       metrics: groupRows(rows),
       lastSeen: now,
-      lastBusy: busy ? now : server.last_busy_ts ?? null
+      lastBusy: busy ? now : server.last_busy_ts ?? null,
+      engineStart: engineStartTs(server.id, rows, now)
     }
   } catch (err) {
     snapshot = {
@@ -157,7 +190,8 @@ export async function scrapeServer (server: ServerRow): Promise<Snapshot> {
       error: err instanceof Error ? err.message : String(err),
       metrics: {},
       lastSeen: server.last_seen ?? null,
-      lastBusy: server.last_busy_ts ?? null
+      lastBusy: server.last_busy_ts ?? null,
+      engineStart: rt.engineStart.get(server.id) ?? null
     }
   }
   const prevSnap = rt.snapshots.get(server.id)

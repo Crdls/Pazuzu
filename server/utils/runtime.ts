@@ -15,6 +15,8 @@ export interface Snapshot {
   lastSeen?: number | null
   /** last scrape ts (ms) with requests running/waiting; null = never busy */
   lastBusy?: number | null
+  /** engine (re)start ts (ms) from generation-counter resets; null = never observed */
+  engineStart?: number | null
 }
 
 interface Runtime {
@@ -24,6 +26,10 @@ interface Runtime {
   prevTs: Map<number, number>
   /** serverId -> last snapshot */
   snapshots: Map<number, Snapshot>
+  /** serverId -> engine (re)start ts (ms), tracked by scrape.ts, kept in settings */
+  engineStart: Map<number, number>
+  /** serverId -> last generation-tokens total (a drop means the engine restarted) */
+  prevGen: Map<number, number>
   scrapeTimer?: ReturnType<typeof setTimeout>
   rollupTimer?: ReturnType<typeof setTimeout>
   scraping: boolean
@@ -110,6 +116,8 @@ export function runtime (): Runtime {
       prev: new Map(),
       prevTs: new Map(),
       snapshots: new Map(),
+      engineStart: new Map(),
+      prevGen: new Map(),
       scraping: false,
       authFails: new Map(),
       gitlabStates: new Map()
@@ -119,6 +127,8 @@ export function runtime (): Runtime {
   // a global created by an older module version (dev HMR) may miss newer fields
   if (!rt.authFails) rt.authFails = new Map()
   if (!rt.gitlabStates) rt.gitlabStates = new Map()
+  if (!rt.engineStart) rt.engineStart = new Map()
+  if (!rt.prevGen) rt.prevGen = new Map()
   if (!rt.gateway) {
     rt.gateway = {
       inflight: new Map(),
@@ -158,6 +168,8 @@ export function forgetServerState (serverId: number) {
   const rt = runtime()
   rt.snapshots.delete(serverId)
   rt.prevTs.delete(serverId)
+  rt.engineStart.delete(serverId)
+  rt.prevGen.delete(serverId)
   if (rt.gateway) {
     rt.gateway.inflight.delete(serverId)
     rt.gateway.ejectedUntil.delete(serverId)
