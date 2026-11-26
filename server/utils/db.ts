@@ -143,6 +143,9 @@ CREATE TABLE IF NOT EXISTS rollup_hourly (
   n         INTEGER NOT NULL,
   PRIMARY KEY (server_id, hour, metric, labels)
 );
+-- the heatmap reads one metric over a time range; the primary key cannot use
+-- metric (hour comes before it) and would scan every metric of the range
+CREATE INDEX IF NOT EXISTS idx_rollup_hourly_metric ON rollup_hourly (server_id, metric, hour);
 CREATE TABLE IF NOT EXISTS rollup_daily (
   server_id INTEGER NOT NULL,
   day       INTEGER NOT NULL,
@@ -154,6 +157,7 @@ CREATE TABLE IF NOT EXISTS rollup_daily (
   n         INTEGER NOT NULL,
   PRIMARY KEY (server_id, day, metric, labels)
 );
+CREATE INDEX IF NOT EXISTS idx_rollup_daily_metric ON rollup_daily (server_id, metric, day);
 CREATE TABLE IF NOT EXISTS gateway_clients (
   id         INTEGER PRIMARY KEY AUTOINCREMENT,
   name       TEXT NOT NULL,
@@ -220,6 +224,11 @@ export function useDb (): Database.Database {
     db = new Database(path)
     db.pragma('journal_mode = WAL')
     db.pragma('synchronous = NORMAL')
+    // the default 16 MB page cache cannot hold the pages of a multi-GB samples
+    // table, so every range scan (heatmap, history, rollups) re-reads them
+    db.pragma('cache_size = -65536') // 64 MB
+    // idempotent DDL: an existing database also picks up new indexes here,
+    // which costs one bounded rebuild the first time it is opened after an update
     db.exec(SCHEMA)
     // upgrades for databases created before the column existed
     ensureColumn(db, 'servers', 'created_by', 'INTEGER')

@@ -3,8 +3,8 @@ import type { HeatmapData } from '../components/LoadHeatmap.vue'
 
 const { t, te } = useI18n()
 
-// view settings persist in cookies, so the saved period/metric is already
-// used on the SSR render of the next visit
+// view settings persist in cookies, so the next visit opens on the same period
+// and metric the browser left behind
 const YEAR = 60 * 60 * 24 * 365
 const period = useCookie<string>('pazuzu_heatmap_period', {
   default: () => '24h',
@@ -15,11 +15,14 @@ const metric = useCookie<string>('pazuzu_heatmap_metric', {
   maxAge: YEAR
 })
 
-const { data, pending, error } = await useFetch<HeatmapData>('/api/heatmap', {
+// client-side on purpose: even a cold multi-server aggregation must not hold
+// the whole page blank, so the shell renders at once and the browser pulls the
+// grid (with its cookies). The card below spins on "no data yet" rather than on
+// `pending`, which is what keeps the server and the client render identical
+const { data, error } = useFetch<HeatmapData>('/api/heatmap', {
   query: { period, metric },
   watch: [period, metric],
-  // forward cookies on the SSR-side call so the auth middleware lets it through
-  headers: useRequestHeaders(['cookie'])
+  server: false
 })
 
 // the saved metric may no longer be in the catalog (e.g. after an update)
@@ -76,7 +79,7 @@ const metricItems = computed(() =>
     />
 
     <UCard variant="soft" class="bg-elevated/30">
-      <div v-if="pending && !data" class="h-40 flex items-center justify-center">
+      <div v-if="!data && !error" class="h-40 flex items-center justify-center">
         <UIcon name="i-lucide-loader-circle" class="size-6 animate-spin text-muted" />
       </div>
       <LoadHeatmap v-else-if="data && data.rows.length" :data="data" />

@@ -3,6 +3,7 @@
  * reloads of plugins/utils do not duplicate timers or lose state.
  */
 import type { AppConfig } from './config'
+import type { HeatmapCacheEntry } from './heatmap.ts'
 
 export interface Snapshot {
   serverId: number
@@ -48,6 +49,8 @@ interface Runtime {
   update?: UpdateRuntime
   /** database maintenance state, see server/utils/rollup.ts */
   storage?: StorageRuntime
+  /** heatmap response cache, see server/utils/heatmap.ts */
+  heatmap?: { cache: Map<string, HeatmapCacheEntry> }
 }
 
 /** Process-wide database maintenance state (see server/utils/rollup.ts). */
@@ -161,6 +164,7 @@ export function runtime (): Runtime {
     }
   }
   if (!rt.storage) rt.storage = { lastVacuumTs: 0, lastThinTs: 0 }
+  if (!rt.heatmap) rt.heatmap = { cache: new Map() }
   return rt
 }
 

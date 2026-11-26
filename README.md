@@ -363,6 +363,13 @@ windows collapse, so neighbouring series never mix and the hourly rollups
 fast at first and then ever more slowly — after a year each series costs one
 row a day.
 
+The heatmap reads the cheapest tier that still holds its cell size: hour-wide
+cells (24 h, 7 d, 30 d, year) come from `rollup_hourly` / `rollup_daily` — the
+hourly tier also covers the current partial hour, since it is recomputed from
+the freshest 3 h — so a whole-fleet day never scans raw samples; only the
+sub-hour views (1 h / 3 h / 12 h) do. A period and metric is recomputed at most
+every 30 s, in between the answer comes from a cache in the API process.
+
 Histogram `*_bucket` series are stored once a minute rather than every scrape
 (the live snapshots still carry them all). A `VACUUM` runs automatically at
 most daily when a lot of pages have been freed; the Settings → System card
@@ -403,7 +410,7 @@ scripts/        reset-password.mjs - lost password recovery (no email)
                 seed-history.mjs - retro-fill synthetic sine history to
                                    exercise the thinning ladder (dev tool)
 test/           parser test on real /metrics fixtures + auth/config/gateway/
-                client-access/update/metrics/thin/inference tests
+                client-access/update/metrics/thin/heatmap/inference tests
 update.sh|.bat  one-shot install/update: pull + install --omit=dev + build
 ```
 
@@ -412,7 +419,7 @@ update.sh|.bat  one-shot install/update: pull + install --omit=dev + build
 - `GET|POST /api/servers`, `PATCH|DELETE /api/servers/:id`, `POST /api/servers/:id/ping` (PATCH/DELETE: creator or admin only when auth is on)
 - `GET /api/live` — current snapshots of all servers
 - `GET /api/range?serverId&metric&from&to` — metric history (raw/hourly/daily — the source is picked automatically)
-- `GET /api/heatmap?metric&period=1h|3h|12h|24h|7d|30d|1y` — servers × buckets matrix
+- `GET /api/heatmap?metric&period=1h|3h|12h|24h|7d|30d|1y` — servers × buckets matrix (cells an hour wide or wider are answered from the rollup tiers; the answer is cached for up to 30 s)
 - `POST /api/inference/run` — Playground: one prompt to several engines at once (1–10 repeat runs per engine), answered as SSE with live text and timings (TTFT / total / tok/s) and a median summary; `GET /api/inference/models?id=` — model ids served by an engine (to fill the `model` field)
 - `GET|PUT /api/settings` (`PUT`: admin only when auth is on)
 - `GET|PUT /api/config` — read and rewrite `config.json` (superadmin only when auth is on; everything except `db.path` applies immediately)
@@ -439,6 +446,7 @@ node test/client-access.test.mjs
 node test/update.test.mjs
 node test/metrics.test.mjs
 node test/thin.test.mjs
+node test/heatmap.test.mjs
 node test/inference.test.mjs
 ```
 

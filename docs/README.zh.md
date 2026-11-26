@@ -301,6 +301,12 @@ Authorization: Bearer pzz_…
 （按最新 3 小时原始数据重算）也保持精确。数据库起初增长很快，之后
 越来越慢 — 一年之后每条序列每天只占一行。
 
+热力图按需读取最便宜的层级：一小时宽的格子（24 小时、7 天、30 天、一年）
+来自 `rollup_hourly` / `rollup_daily` — 小时汇总按最新 3 小时重算，因此也
+覆盖当前未满的一小时 — 所以整机的「一天」视图根本不扫描原始 samples，
+只有步长小于一小时的视图（1 小时 / 3 小时 / 12 小时）才会。「周期 + 指标」
+每 30 秒最多重算一次，其余时间直接命中 API 进程内的缓存。
+
 直方图 `*_bucket` 序列每分钟存一次而不是每次采集（实时快照仍包含
 全部数据）。当释放的页很多时每天最多自动执行一次 `VACUUM`；
 「设置 → 系统」卡片显示数据库大小和行数，超级管理员可用「立即清理」
@@ -336,7 +342,7 @@ scripts/        reset-password.mjs — 密码恢复（无需邮箱）
                            （降采样 + VACUUM）；请在服务器停止时运行
                 seed-history.mjs — 回填合成正弦历史数据，用于验证
                                    降采样阶梯（开发工具）
-test/           基于真实 /metrics 固定数据的解析器测试 + 认证/配置/网关/更新/指标目录/降采样/试验场测试
+test/           基于真实 /metrics 固定数据的解析器测试 + 认证/配置/网关/更新/指标目录/降采样/热力图/试验场测试
 update.sh|.bat  一键安装/更新：pull + install --omit=dev + build
 ```
 
@@ -345,7 +351,7 @@ update.sh|.bat  一键安装/更新：pull + install --omit=dev + build
 - `GET|POST /api/servers`、`PATCH|DELETE /api/servers/:id`、`POST /api/servers/:id/ping`（PATCH/DELETE：开启验证后仅创建者或管理员可调用）
 - `GET /api/live` — 所有服务器的当前快照
 - `GET /api/range?serverId&metric&from&to` — 指标历史（raw/hourly/daily — 数据源自动选择）
-- `GET /api/heatmap?metric&period=1h|3h|12h|24h|7d|30d|1y` — 服务器 × 时间桶矩阵
+- `GET /api/heatmap?metric&period=1h|3h|12h|24h|7d|30d|1y` — 服务器 × 时间桶矩阵（一小时及以上的格子取自汇总层；响应缓存最多 30 秒）
 - `POST /api/inference/run` — 试验场：一个提示词同时发往多个引擎（每个引擎 1–10 次重复），以 SSE 返回实时文本与计时（TTFT / 总时长 / tok/s）及中位数汇总；`GET /api/inference/models?id=` — 引擎所提供的模型列表（用于填写 `model` 字段）
 - `GET|PUT /api/settings`（`PUT`：开启验证后仅管理员）
 - `GET|PUT /api/config` — 读取并重写 `config.json`（开启验证后仅超级管理员；除 `db.path` 外全部立即生效）
@@ -372,6 +378,7 @@ node test/client-access.test.mjs
 node test/update.test.mjs
 node test/metrics.test.mjs
 node test/thin.test.mjs
+node test/heatmap.test.mjs
 node test/inference.test.mjs
 ```
 
